@@ -1,0 +1,289 @@
+﻿behaviour("TeamHeroes")
+
+-- config variables
+local isPercentConfig = false					-- use number or percent config
+
+local numBlueHeroes = 1							-- number of heroes on blue team
+local numRedHeroes = 1							-- number of heroes on red team
+
+local percentBlueHeroes = 1						-- percent of heroes on blue team
+local percentRedHeroes = 1						-- percent of heroes on red team
+
+local isDisablePlayerRandSelectHero = false 	-- lets the player be randomly selected as a hero, disabling this means player will never be chosen
+local isPlayerAlwaysHero = false				-- player will always start the game as a hero, overrides any other settings
+
+local heroMaxHealth = 300						-- game gives this amount of health to heroes when they are chosen
+
+local isDisableResupplyHealth = false			-- disable health resupply
+local resupplyTimeHealth = 1					-- delay in seconds for health resupply around hero
+local resupplyRangeHealth = 20					-- game units of how far health resupplies around hero
+
+local isDisableResupplyAmmo = false				-- disable ammo resupply
+local resupplyTimeAmmo = 1						-- delay in seconds for ammo resupply around hero
+local resupplyRangeAmmo = 20					-- game units of how far health resupplies around hero
+
+local isDisableHeroDamage = false				-- disable hero proximity damage
+local damageTime = 1							-- delay in seconds for damage around hero
+local damageRange = 20							-- game units of how far units are damaged around hero
+local damageAmount = 25							-- damage amount to surrounding units
+
+-- private variables
+local stopwatchHealth = 0
+local stopwatchAmmo = 0
+local stopwatchDamage = 0
+local heroBlueArray = {}
+local heroRedArray = {}
+local flagPrefab = nil
+local mutatorScript = nil
+
+function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor)
+	-- get actors on team
+	local actorArray = ActorManager.GetActorsOnTeam(team)
+	print("TEAM: " .. tostring(team))
+	print("Number of actors: " .. tostring(#actorArray))
+
+	-- remove player from array if specified
+	if (isDisablePlayerRandSelectHero and not isPlayerAlwaysHero) then
+		for i,actor in ipairs(actorArray) do
+			if (actor == Player.actor) then
+				table.remove(actorArray, i)
+			end
+		end
+	end
+
+	-- check if using percent config or number config
+	if (isPercentConfig) then
+		numHeroes = math.ceil((percentHeroes / 100) * #actorArray)	-- always round up
+	end
+
+	-- error check number of heroes
+	if (numHeroes > #actorArray) then
+		numHeroes = #actorArray
+	elseif (numHeroes < 0) then
+		numHeroes = 0
+	end
+
+	print("Number of Heroes: " .. numHeroes)
+
+	-- exit if hero count is zero
+	if (numHeroes == 0) then
+		return
+	end
+
+	-- create random non-repeating array
+	local randNonRepeatArray = {}
+	-- automatically add player to array if specified
+	if (isPlayerAlwaysHero and (Player.actor.team == team)) then
+		for i,actor in ipairs(actorArray) do
+			if (actor == Player.actor) then
+				table.insert(randNonRepeatArray, i)
+			end
+		end
+	end
+
+	-- add to random non-repeating array
+	while #randNonRepeatArray < numHeroes do
+		-- generate random index
+		local r = math.random(1,#actorArray)
+		local duplicate = false
+		-- check if number is player's number
+		if (isDisablePlayerrandNonRepeatArrayelectHero and (actorArray[r] == Player.actor)) then
+			duplicate = true
+		end
+		-- check if number is already in random array
+		for i,num in ipairs(randNonRepeatArray) do
+			if (num == r) then
+				duplicate = true
+				break
+			end
+		end
+		if not (duplicate) then
+			table.insert(randNonRepeatArray, r)
+		end
+	end
+
+	-- create hero array for team, setup health and flag
+	for i=1,numHeroes,1 do
+		-- pick random actor as hero
+		local selectedHeroNum = table.remove(randNonRepeatArray, #randNonRepeatArray)
+		table.insert(heroArray, actorArray[selectedHeroNum])
+		print("Index: " .. tostring(selectedHeroNum) .. " | Hero: " .. tostring(heroArray[#heroArray].name))
+		-- set health for hero
+		heroArray[#heroArray].maxHealth = heroMaxHealth
+		local healthToAdd = -heroMaxHealth + heroArray[#heroArray].health
+		heroArray[#heroArray].Damage(healthToAdd)
+		-- give flag to hero
+		local heroFlag = GameObject.Instantiate(flagPrefab)
+		heroFlag.transform.SetParent(heroArray[#heroArray].transform)
+		-- flag position for bots and player
+		if (heroArray[#heroArray] ~= Player.actor) then
+			-- bot's soldier model
+			heroFlag.transform.position = heroArray[#heroArray].transform.GetChild(0).position
+		else
+			-- player's soldier model
+			heroFlag.transform.position = heroArray[#heroArray].transform.GetChild(1).position
+			-- make sure flag is not blocking view of camera
+			heroFlag.transform.rotation = heroArray[#heroArray].transform.GetChild(0).rotation
+		end
+		-- change flag color according to team
+		heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(0).gameObject.GetComponent(Renderer).material.color = teamColor
+		heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material.color = teamColor
+	end
+	print("----------")
+
+	return
+end
+
+function ResupplyHealthSurround(heroArray, team)
+	for i,hero in ipairs(heroArray) do
+		-- check if hero is dead
+		-- NOTE: body still stays around after killed
+		if not (hero.isDead) then
+			-- heal self and surrounding team
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, resupplyRangeHealth)
+			for j,actor in ipairs(actorsArray) do
+				-- check actor team color
+				if (actor.team == team) then
+					actor.ResupplyHealth()
+				end
+			end
+		end
+	end
+end
+
+function ResupplyAmmoSurround(heroArray, team)
+	for i,hero in ipairs(heroArray) do
+		-- check if hero is dead
+		-- NOTE: body still stays around after killed
+		if not (hero.isDead) then
+			-- ammo self and surrounding team
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, resupplyRangeAmmo)
+			for j,actor in ipairs(actorsArray) do
+				-- check actor team color
+				if (actor.team == team) then
+					actor.ResupplyAmmo()
+				end
+			end
+		end
+	end
+end
+
+function DamageSurround(heroArray, team)
+	for i,hero in ipairs(heroArray) do
+		-- check if hero is dead
+		-- NOTE: body still stays around after killed
+		if not (hero.isDead) then
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, damageRange)
+			for j,actor in ipairs(actorsArray) do
+				-- check actor team color
+				if (actor.team ~= team) then
+					local heroDamage = DamageInfo()
+					heroDamage.healthDamage = damageAmount
+					heroDamage.direction =  actor.position - hero.position
+					actor.Damage(hero, heroDamage)
+				end
+			end
+		end
+	end
+end
+
+function setConfigurationVariables()
+	local configChoice = mutatorScript.GetConfigurationDropdown("isPercentConfig")
+	if (configChoice == 0) then
+		isPercentConfig = false
+	else
+		isPercentConfig = true
+	end
+
+	numBlueHeroes = mutatorScript.GetConfigurationInt("numBlueHeroes")
+	numRedHeroes = mutatorScript.GetConfigurationInt("numRedHeroes")
+
+	percentBlueHeroes = mutatorScript.GetConfigurationRange("percentBlueHeroes")
+	percentRedHeroes = mutatorScript.GetConfigurationRange("percentRedHeroes")
+
+	local randomlySelectConfig = mutatorScript.GetConfigurationDropdown("randomlySelectConfig")
+	if (randomlySelectConfig == 0) then
+		isDisablePlayerRandSelectHero = false
+		isPlayerAlwaysHero = false
+	elseif (randomlySelectConfig == 1) then
+		isDisablePlayerRandSelectHero = true
+		isPlayerAlwaysHero = false
+	elseif (randomlySelectConfig == 2) then
+		isDisablePlayerRandSelectHero = false
+		isPlayerAlwaysHero = true
+	end
+
+	heroMaxHealth = mutatorScript.GetConfigurationInt("heroMaxHealth")
+
+	isDisableResupplyHealth = mutatorScript.GetConfigurationBool("isDisableResupplyHealth")
+	resupplyTimeHealth = mutatorScript.GetConfigurationFloat("resupplyTimeHealth")
+	resupplyRangeHealth = mutatorScript.GetConfigurationInt("resupplyRangeHealth")
+
+	isDisableResupplyAmmo = mutatorScript.GetConfigurationBool("isDisableResupplyAmmo")
+	resupplyTimeAmmo = mutatorScript.GetConfigurationFloat("resupplyTimeAmmo")
+	resupplyRangeAmmo = mutatorScript.GetConfigurationInt("resupplyRangeAmmo")
+
+	isDisableHeroDamage = mutatorScript.GetConfigurationBool("isDisableHeroDamage")
+	damageTime = mutatorScript.GetConfigurationFloat("damageTime")
+	damageRange = mutatorScript.GetConfigurationInt("damageRange")
+	damageAmount = mutatorScript.GetConfigurationInt("damageAmount")
+end
+
+function TeamHeroes:Start()
+	-- clear variables
+	heroBlueArray = {}
+	heroRedArray = {}
+	stopwatchHealth = 0
+	stopwatchAmmo = 0
+	stopwatchDamage = 0
+	flagPrefab = self.targets.flag
+
+	-- load user's settings
+	mutatorScript = self.script.mutator
+	setConfigurationVariables()
+
+	-- make sure numbers are random
+	math.randomseed(Time.time)
+
+	-- initialize heroes
+	local actorBlueArray = ActorManager.GetActorsOnTeam(Team.Blue)
+	if (#actorBlueArray >= 1) then
+		initializeHero(heroBlueArray, numBlueHeroes, percentBlueHeroes, Team.Blue, Color.blue)
+	end
+	local actorRedArray = ActorManager.GetActorsOnTeam(Team.Red)
+	if (#actorRedArray >= 1) then
+		initializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red)
+	end
+end
+
+function TeamHeroes:Update()
+	-- resupply health to units around hero, including hero
+	stopwatchHealth = stopwatchHealth + Time.deltaTime
+	if (stopwatchHealth >= resupplyTimeHealth) then
+		if not (isDisableResupplyHealth) then
+			ResupplyHealthSurround(heroBlueArray, Team.Blue)
+			ResupplyHealthSurround(heroRedArray, Team.Red)
+		end
+		stopwatchHealth = 0
+	end
+
+	-- resupply ammo to units around hero, including hero
+	stopwatchAmmo = stopwatchAmmo + Time.deltaTime
+	if (stopwatchAmmo >= resupplyTimeAmmo) then
+		if not (isDisableResupplyAmmo) then
+			ResupplyAmmoSurround(heroBlueArray, Team.Blue)
+			ResupplyAmmoSurround(heroRedArray, Team.Red)
+		end
+		stopwatchAmmo = 0
+	end
+
+	-- damage units around hero
+	stopwatchDamage = stopwatchDamage + Time.deltaTime
+	if (stopwatchDamage >= damageTime) then
+		if not (isDisableHeroDamage) then
+			DamageSurround(heroBlueArray, Team.Blue)
+			DamageSurround(heroRedArray, Team.Red)
+		end
+		stopwatchDamage = 0
+	end
+end
