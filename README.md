@@ -1,2 +1,2 @@
 # TeamHeroes
-Ravenscript mutator
+Ravenscript mutator mod for the game Ravenfield
