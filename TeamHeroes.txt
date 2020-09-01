@@ -115,7 +115,6 @@ function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor)
 		heroArray[#heroArray].Damage(healthToAdd)
 		-- scale flag
 		flagPrefab.transform.GetChild(0).localScale = Vector3(flagScale, flagScale, flagScale)
-		print(flagPrefab.transform.GetChild(0))
 		-- give flag to hero
 		local heroFlag = GameObject.Instantiate(flagPrefab)
 		heroFlag.transform.SetParent(heroArray[#heroArray].transform)
