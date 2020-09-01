@@ -25,7 +25,7 @@ local resupplyRangeAmmo = 20					-- game units of how far health resupplies arou
 local isDisableHeroDamage = false				-- disable hero proximity damage
 local damageTime = 1							-- delay in seconds for damage around hero
 local damageRange = 20							-- game units of how far units are damaged around hero
-local damageAmount = 25							-- damage amount to surrounding units
+local damageAmount = 10							-- damage amount to surrounding units
 
 -- private variables
 local stopwatchHealth = 0
