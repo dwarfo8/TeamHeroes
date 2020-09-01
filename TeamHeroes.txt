@@ -26,6 +26,7 @@ local isDisableHeroDamage = false				-- disable hero proximity damage
 local damageTime = 1							-- delay in seconds for damage around hero
 local damageRange = 20							-- game units of how far units are damaged around hero
 local damageAmount = 10							-- damage amount to surrounding units
+local flagScale = 1								-- size of the flag
 
 -- private variables
 local stopwatchHealth = 0
@@ -112,6 +113,9 @@ function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor)
 		heroArray[#heroArray].maxHealth = heroMaxHealth
 		local healthToAdd = -heroMaxHealth + heroArray[#heroArray].health
 		heroArray[#heroArray].Damage(healthToAdd)
+		-- scale flag
+		flagPrefab.transform.GetChild(0).localScale = Vector3(flagScale, flagScale, flagScale)
+		print(flagPrefab.transform.GetChild(0))
 		-- give flag to hero
 		local heroFlag = GameObject.Instantiate(flagPrefab)
 		heroFlag.transform.SetParent(heroArray[#heroArray].transform)
@@ -227,6 +231,7 @@ function setConfigurationVariables()
 	damageTime = mutatorScript.GetConfigurationFloat("damageTime")
 	damageRange = mutatorScript.GetConfigurationInt("damageRange")
 	damageAmount = mutatorScript.GetConfigurationInt("damageAmount")
+	flagScale = mutatorScript.GetConfigurationFloat("flagScale")
 end
 
 function TeamHeroes:Start()
