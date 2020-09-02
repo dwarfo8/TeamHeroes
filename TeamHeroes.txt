@@ -146,7 +146,7 @@ function ResupplyHealthSurround(heroArray, team)
 			local actorsArray = ActorManager.AliveActorsInRange(hero.position, resupplyRangeHealth)
 			for j,actor in ipairs(actorsArray) do
 				-- check actor team color
-				if (actor.team == team) then
+				if (actor.team == team and ActorManager.ActorsCanSeeEachOther(hero, actor)) then
 					actor.ResupplyHealth()
 				end
 			end
@@ -163,7 +163,7 @@ function ResupplyAmmoSurround(heroArray, team)
 			local actorsArray = ActorManager.AliveActorsInRange(hero.position, resupplyRangeAmmo)
 			for j,actor in ipairs(actorsArray) do
 				-- check actor team color
-				if (actor.team == team) then
+				if (actor.team == team and ActorManager.ActorsCanSeeEachOther(hero, actor)) then
 					actor.ResupplyAmmo()
 				end
 			end
@@ -179,7 +179,7 @@ function DamageSurround(heroArray, team)
 			local actorsArray = ActorManager.AliveActorsInRange(hero.position, damageRange)
 			for j,actor in ipairs(actorsArray) do
 				-- check actor team color
-				if (actor.team ~= team) then
+				if (actor.team ~= team and ActorManager.ActorsCanSeeEachOther(hero, actor)) then
 					local heroDamage = DamageInfo()
 					heroDamage.healthDamage = damageAmount
 					heroDamage.direction =  actor.position - hero.position
