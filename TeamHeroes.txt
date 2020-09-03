@@ -27,6 +27,8 @@ local damageTime = 1							-- delay in seconds for damage around hero
 local damageRange = 20							-- game units of how far units are damaged around hero
 local damageAmount = 10							-- damage amount to surrounding units
 local flagScale = 1								-- size of the flag
+local isDisableFlag = false						-- disables hero flag
+local isDisableSkin = false						-- disables hero skin
 
 -- private variables
 local stopwatchHealth = 0
@@ -35,9 +37,11 @@ local stopwatchDamage = 0
 local heroBlueArray = {}
 local heroRedArray = {}
 local flagPrefab = nil
+local heroSkinBlue = nil
+local heroSkinRed = nil
 local mutatorScript = nil
 
-function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor)
+function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin)
 	-- get actors on team
 	local actorArray = ActorManager.GetActorsOnTeam(team)
 	print("TEAM: " .. tostring(team))
@@ -103,34 +107,50 @@ function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor)
 		end
 	end
 
-	-- create hero array for team, setup health and flag
+	-- create hero array for team, setup health, flag, skin
 	for i=1,numHeroes,1 do
 		-- pick random actor as hero
 		local selectedHeroNum = table.remove(randNonRepeatArray, #randNonRepeatArray)
 		table.insert(heroArray, actorArray[selectedHeroNum])
 		print("Index: " .. tostring(selectedHeroNum) .. " | Hero: " .. tostring(heroArray[#heroArray].name))
+
 		-- set health for hero
 		heroArray[#heroArray].maxHealth = heroMaxHealth
 		local healthToAdd = -heroMaxHealth + heroArray[#heroArray].health
 		heroArray[#heroArray].Damage(healthToAdd)
-		-- scale flag
-		flagPrefab.transform.GetChild(0).localScale = Vector3(flagScale, flagScale, flagScale)
-		-- give flag to hero
-		local heroFlag = GameObject.Instantiate(flagPrefab)
-		heroFlag.transform.SetParent(heroArray[#heroArray].transform)
-		-- flag position for bots and player
-		if (heroArray[#heroArray] ~= Player.actor) then
-			-- bot's soldier model
-			heroFlag.transform.position = heroArray[#heroArray].transform.GetChild(0).position
-		else
-			-- player's soldier model
-			heroFlag.transform.position = heroArray[#heroArray].transform.GetChild(1).position
-			-- make sure flag is not blocking view of camera
-			heroFlag.transform.rotation = heroArray[#heroArray].transform.GetChild(0).rotation
+
+		-- set flag to hero
+		if not (isDisableFlag) then
+			flagPrefab.transform.GetChild(0).localScale = Vector3(flagScale, flagScale, flagScale)	-- scale flag
+			local heroFlag = GameObject.Instantiate(flagPrefab)
+			heroFlag.transform.SetParent(heroArray[#heroArray].transform)
+			-- flag position for bots and player
+			if (heroArray[#heroArray] ~= Player.actor) then
+				-- bot's soldier model
+				heroFlag.transform.position = heroArray[#heroArray].transform.GetChild(0).position
+			else
+				-- player's soldier model
+				heroFlag.transform.position = heroArray[#heroArray].transform.GetChild(1).position
+				-- make sure flag is not blocking view of camera
+				heroFlag.transform.rotation = PlayerCamera.fpCamera.gameObject.transform.GetChild(0).rotation
+			end
+			-- change flag color according to team
+			heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(0).gameObject.GetComponent(Renderer).material.color = teamColor
+			heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material.color = teamColor
 		end
-		-- change flag color according to team
-		heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(0).gameObject.GetComponent(Renderer).material.color = teamColor
-		heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material.color = teamColor
+
+		-- set material to hero skin
+		if not (isDisableSkin) then
+			if (heroArray[#heroArray] ~= Player.actor) then
+				-- player skin
+				heroArray[#heroArray].transform.GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- soldier model
+				heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- ragdoll model
+			else
+				-- bot skin
+				heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- soldier model
+				heroArray[#heroArray].transform.GetChild(2).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- ragdoll model
+			end
+		end
 	end
 	print("----------")
 
@@ -231,6 +251,8 @@ function setConfigurationVariables()
 	damageRange = mutatorScript.GetConfigurationInt("damageRange")
 	damageAmount = mutatorScript.GetConfigurationInt("damageAmount")
 	flagScale = mutatorScript.GetConfigurationFloat("flagScale")
+	isDisableFlag = mutatorScript.GetConfigurationBool("isDisableFlag")
+	isDisableSkin = mutatorScript.GetConfigurationBool("isDisableSkin")
 end
 
 function TeamHeroes:Start()
@@ -241,6 +263,8 @@ function TeamHeroes:Start()
 	stopwatchAmmo = 0
 	stopwatchDamage = 0
 	flagPrefab = self.targets.flag
+	heroSkinBlue = self.targets.heroSkinBlue
+	heroSkinRed = self.targets.heroSkinRed
 
 	-- load user's settings
 	mutatorScript = self.script.mutator
@@ -252,11 +276,11 @@ function TeamHeroes:Start()
 	-- initialize heroes
 	local actorBlueArray = ActorManager.GetActorsOnTeam(Team.Blue)
 	if (#actorBlueArray >= 1) then
-		initializeHero(heroBlueArray, numBlueHeroes, percentBlueHeroes, Team.Blue, Color.blue)
+		initializeHero(heroBlueArray, numBlueHeroes, percentBlueHeroes, Team.Blue, Color.blue, heroSkinBlue)
 	end
 	local actorRedArray = ActorManager.GetActorsOnTeam(Team.Red)
 	if (#actorRedArray >= 1) then
-		initializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red)
+		initializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red, heroSkinRed)
 	end
 end
 
