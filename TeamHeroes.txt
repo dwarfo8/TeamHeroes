@@ -135,8 +135,8 @@ function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, he
 				heroFlag.transform.rotation = PlayerCamera.fpCamera.gameObject.transform.GetChild(0).rotation
 			end
 			-- change flag color according to team
-			heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(0).gameObject.GetComponent(Renderer).material.color = teamColor
-			heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material.color = teamColor
+			heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(0).gameObject.GetComponent(Renderer).material.color = teamColor		-- static flag
+			heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material.color = teamColor		-- cloth physics flag
 		end
 
 		-- set material to hero skin
