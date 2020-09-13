@@ -26,9 +26,18 @@ local isDisableHeroDamage = false				-- disable hero proximity damage
 local damageTime = 1							-- delay in seconds for damage around hero
 local damageRange = 20							-- game units of how far units are damaged around hero
 local damageAmount = 10							-- damage amount to surrounding units
+
 local flagScale = 1								-- size of the flag
 local isDisableFlag = false						-- disables hero flag
 local isDisableSkin = false						-- disables hero skin
+
+local isDisableOverheal = false					-- disable ally overheal
+local overhealRange = 20						-- game units of how far units are affected by overheal around hero
+local overhealMax = 150							-- max overheal amount for allies
+
+local isDisableRecruit = false					-- disable ally recruit
+local recruitRange = 100						-- recruit range
+local recruitAmount = 4							-- number of allies that should be added to the hero's squad
 
 -- private variables
 local stopwatchHealth = 0
@@ -40,6 +49,10 @@ local flagPrefab = nil
 local heroSkinBlue = nil
 local heroSkinRed = nil
 local mutatorScript = nil
+local allyBlueInitHealthDict = {}
+local allyRedInitHealthDict = {}
+local stopwatchOverheal = 0
+local overhealTime = 1
 
 function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin)
 	-- get actors on team
@@ -157,6 +170,65 @@ function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, he
 	return
 end
 
+function initializeHealthDict(heroArray, team, allyInitHealthDict)
+	-- actors on team
+	local actorsArray = ActorManager.GetActorsOnTeam(team)
+
+	-- create temp health dict
+	local tempInitHealthDict = {}
+	for i,actor in ipairs(actorsArray) do
+		tempInitHealthDict[actor] = actor.health
+	end
+
+	-- remove heroes from temp health dict
+	for i,hero in ipairs(heroArray) do
+		tempInitHealthDict[hero] = nil
+	end
+
+	-- add to actual ally health dict
+	for actor,initHealth in pairs(tempInitHealthDict) do
+		if (initHealth ~= nil) then
+			allyInitHealthDict[actor] = initHealth
+		end
+	end
+end
+
+function OverhealAlly(heroArray, team, allyInitHealthDict)
+	-- create copy of health dictionary for ally outside of range
+	local allyOutOfRangeHealthDict = {}
+	for i,j in pairs(allyInitHealthDict) do
+		allyOutOfRangeHealthDict[i] = j
+	end
+	
+	-- overheal health if near hero
+	for i,hero in ipairs(heroArray) do
+		-- check if hero is dead
+		-- NOTE: body still stays around after killed
+		if not (hero.isDead) then
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, overhealRange)
+			for j,actor in ipairs(actorsArray) do
+				-- check actor team color
+				if (actor.team == team and allyInitHealthDict[actor] ~= nil) then
+					actor.maxHealth = overhealMax
+					allyOutOfRangeHealthDict[actor] = nil
+				end
+			end
+		end
+	end
+
+	-- set to base health for ally out of range
+	for i,hero in ipairs(heroArray) do
+		for actor,initHealth in pairs(allyOutOfRangeHealthDict) do
+			if (initHealth ~= nil) then
+				actor.maxHealth = initHealth
+				if (actor.health > actor.maxHealth) then
+					actor.ResupplyHealth()	
+				end
+			end
+		end
+	end
+end
+
 function ResupplyHealthSurround(heroArray, team)
 	for i,hero in ipairs(heroArray) do
 		-- check if hero is dead
@@ -166,7 +238,7 @@ function ResupplyHealthSurround(heroArray, team)
 			local actorsArray = ActorManager.AliveActorsInRange(hero.position, resupplyRangeHealth)
 			for j,actor in ipairs(actorsArray) do
 				-- check actor team color
-				if (actor.team == team and ActorManager.ActorsCanSeeEachOther(hero, actor)) then
+				if (actor.team == team) then
 					actor.ResupplyHealth()
 				end
 			end
@@ -183,7 +255,7 @@ function ResupplyAmmoSurround(heroArray, team)
 			local actorsArray = ActorManager.AliveActorsInRange(hero.position, resupplyRangeAmmo)
 			for j,actor in ipairs(actorsArray) do
 				-- check actor team color
-				if (actor.team == team and ActorManager.ActorsCanSeeEachOther(hero, actor)) then
+				if (actor.team == team) then
 					actor.ResupplyAmmo()
 				end
 			end
@@ -205,6 +277,39 @@ function DamageSurround(heroArray, team)
 					heroDamage.direction =  actor.position - hero.position
 					actor.Damage(hero, heroDamage)
 				end
+			end
+		end
+	end
+end
+
+function TeamHeroes:RecruitAlly(squad)
+	-- Get team and team's heroArray
+	local team = squad.leader.team
+	local heroArray = {}
+	if (team == Team.Blue) then
+		heroArray = heroBlueArray
+	else
+		heroArray = heroRedArray
+	end
+
+	-- check if squad contains a hero
+	local isHeroSquad = false
+	for i,hero in ipairs(heroArray) do
+		local squadArray = squad.members
+		for j,actor in ipairs(squadArray) do
+			if (actor == hero) then
+				isHeroSquad = true
+				break
+			end
+		end
+	end
+
+	-- recruit nearby soldiers
+	if (isHeroSquad) then
+		local actorsArray = ActorManager.AliveActorsInRange(squad.leader.position, recruitRange)
+		for i,actor in ipairs(actorsArray) do
+			if ((#squad.members < recruitAmount) and (actor.team == team) and (actor ~= Player.actor)) then
+				squad.AddMember(actor)
 			end
 		end
 	end
@@ -250,9 +355,18 @@ function setConfigurationVariables()
 	damageTime = mutatorScript.GetConfigurationFloat("damageTime")
 	damageRange = mutatorScript.GetConfigurationInt("damageRange")
 	damageAmount = mutatorScript.GetConfigurationInt("damageAmount")
+
 	flagScale = mutatorScript.GetConfigurationFloat("flagScale")
 	isDisableFlag = mutatorScript.GetConfigurationBool("isDisableFlag")
 	isDisableSkin = mutatorScript.GetConfigurationBool("isDisableSkin")
+
+	isDisableOverheal = mutatorScript.GetConfigurationBool("isDisableOverheal")
+	overhealRange = mutatorScript.GetConfigurationInt("overhealRange")
+	overhealMax = mutatorScript.GetConfigurationInt("overhealMax")
+
+	isDisableRecruit = mutatorScript.GetConfigurationBool("isDisableRecruit")
+	recruitRange = mutatorScript.GetConfigurationInt("recruitRange")
+	recruitAmount = mutatorScript.GetConfigurationInt("recruitAmount")
 end
 
 function TeamHeroes:Start()
@@ -265,6 +379,9 @@ function TeamHeroes:Start()
 	flagPrefab = self.targets.flag
 	heroSkinBlue = self.targets.heroSkinBlue
 	heroSkinRed = self.targets.heroSkinRed
+	allyBlueInitHealthDict = {}
+	allyRedInitHealthDict = {}
+	stopwatchOverheal = 0
 
 	-- load user's settings
 	mutatorScript = self.script.mutator
@@ -282,36 +399,55 @@ function TeamHeroes:Start()
 	if (#actorRedArray >= 1) then
 		initializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red, heroSkinRed)
 	end
+
+	-- initialize health dictionary
+	initializeHealthDict(heroBlueArray, Team.Blue, allyBlueInitHealthDict)
+	initializeHealthDict(heroRedArray, Team.Red, allyRedInitHealthDict)
+
+	-- recruit ally units
+	if not (isDisableRecruit) then
+		GameEvents.onSquadCreated.AddListener(self, "RecruitAlly")
+	end
 end
 
 function TeamHeroes:Update()
+	-- overheal ally units
+	if not (isDisableOverheal) then
+		stopwatchOverheal = stopwatchOverheal + Time.deltaTime
+		if (stopwatchOverheal >= overhealTime) then
+			OverhealAlly(heroBlueArray, Team.Blue, allyBlueInitHealthDict)
+			OverhealAlly(heroRedArray, Team.Red, allyRedInitHealthDict)
+			stopwatchOverheal = 0
+		end
+	end
+
 	-- resupply health to units around hero, including hero
-	stopwatchHealth = stopwatchHealth + Time.deltaTime
-	if (stopwatchHealth >= resupplyTimeHealth) then
-		if not (isDisableResupplyHealth) then
+	if not (isDisableResupplyHealth) then
+		stopwatchHealth = stopwatchHealth + Time.deltaTime
+		if (stopwatchHealth >= resupplyTimeHealth) then
 			ResupplyHealthSurround(heroBlueArray, Team.Blue)
 			ResupplyHealthSurround(heroRedArray, Team.Red)
+			stopwatchHealth = 0
 		end
-		stopwatchHealth = 0
 	end
 
 	-- resupply ammo to units around hero, including hero
-	stopwatchAmmo = stopwatchAmmo + Time.deltaTime
-	if (stopwatchAmmo >= resupplyTimeAmmo) then
-		if not (isDisableResupplyAmmo) then
+	if not (isDisableResupplyAmmo) then
+		stopwatchAmmo = stopwatchAmmo + Time.deltaTime
+		if (stopwatchAmmo >= resupplyTimeAmmo) then
 			ResupplyAmmoSurround(heroBlueArray, Team.Blue)
 			ResupplyAmmoSurround(heroRedArray, Team.Red)
+			stopwatchAmmo = 0
 		end
-		stopwatchAmmo = 0
 	end
 
 	-- damage units around hero
-	stopwatchDamage = stopwatchDamage + Time.deltaTime
-	if (stopwatchDamage >= damageTime) then
-		if not (isDisableHeroDamage) then
+	if not (isDisableHeroDamage) then
+		stopwatchDamage = stopwatchDamage + Time.deltaTime
+		if (stopwatchDamage >= damageTime) then
 			DamageSurround(heroBlueArray, Team.Blue)
 			DamageSurround(heroRedArray, Team.Red)
+			stopwatchDamage = 0
 		end
-		stopwatchDamage = 0
 	end
 end
