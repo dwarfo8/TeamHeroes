@@ -36,27 +36,31 @@ local overhealRange = 20						-- game units of how far units are affected by ove
 local overhealMax = 150							-- max overheal amount for allies
 
 local isDisableRecruit = false					-- disable ally recruit
-local recruitRange = 100						-- recruit range
+local recruitRange = 50							-- recruit range
 local recruitAmount = 4							-- number of allies that should be added to the hero's squad
 
 -- private variables
-local stopwatchHealth = 0
-local stopwatchAmmo = 0
-local stopwatchDamage = 0
 local heroBlueArray = {}
 local heroRedArray = {}
+local heroBlueDict = {}
+local heroRedDict = {}
 local flagPrefab = nil
 local heroSkinBlue = nil
 local heroSkinRed = nil
 local mutatorScript = nil
 local allyBlueInitHealthDict = {}
 local allyRedInitHealthDict = {}
-local stopwatchOverheal = 0
 local overhealTime = 1
 
-function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin)
+function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroDict)
 	-- get actors on team
 	local actorArray = ActorManager.GetActorsOnTeam(team)
+
+	-- exit if there are no actors
+	if (#actorArray == 0) then
+		return
+	end
+
 	print("TEAM: " .. tostring(team))
 	print("Number of actors: " .. tostring(#actorArray))
 
@@ -127,6 +131,9 @@ function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, he
 		table.insert(heroArray, actorArray[selectedHeroNum])
 		print("Index: " .. tostring(selectedHeroNum) .. " | Hero: " .. tostring(heroArray[#heroArray].name))
 
+		-- add to hero dict
+		heroDict[heroArray[#heroArray]] = heroArray[#heroArray]
+
 		-- set health for hero
 		heroArray[#heroArray].maxHealth = heroMaxHealth
 		local healthToAdd = -heroMaxHealth + heroArray[#heroArray].health
@@ -170,7 +177,7 @@ function initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, he
 	return
 end
 
-function initializeHealthDict(heroArray, team, allyInitHealthDict)
+function TeamHeroes:initializeHealthDict(heroArray, team, allyInitHealthDict)
 	-- actors on team
 	local actorsArray = ActorManager.GetActorsOnTeam(team)
 
@@ -193,7 +200,7 @@ function initializeHealthDict(heroArray, team, allyInitHealthDict)
 	end
 end
 
-function OverhealAlly(heroArray, team, allyInitHealthDict)
+function TeamHeroes:OverhealAlly(heroArray, team, allyInitHealthDict)
 	-- create copy of health dictionary for ally outside of range
 	local allyOutOfRangeHealthDict = {}
 	for i,j in pairs(allyInitHealthDict) do
@@ -212,24 +219,23 @@ function OverhealAlly(heroArray, team, allyInitHealthDict)
 					actor.maxHealth = overhealMax
 					allyOutOfRangeHealthDict[actor] = nil
 				end
+				coroutine.yield()
 			end
 		end
 	end
 
 	-- set to base health for ally out of range
-	for i,hero in ipairs(heroArray) do
-		for actor,initHealth in pairs(allyOutOfRangeHealthDict) do
-			if (initHealth ~= nil) then
-				actor.maxHealth = initHealth
-				if (actor.health > actor.maxHealth) then
-					actor.ResupplyHealth()	
-				end
+	for actor,initHealth in pairs(allyOutOfRangeHealthDict) do
+		if (initHealth ~= nil) then
+			actor.maxHealth = initHealth
+			if (actor.health > actor.maxHealth) then
+				actor.ResupplyHealth()	
 			end
 		end
 	end
 end
 
-function ResupplyHealthSurround(heroArray, team)
+function TeamHeroes:ResupplyHealthSurround(heroArray, team)
 	for i,hero in ipairs(heroArray) do
 		-- check if hero is dead
 		-- NOTE: body still stays around after killed
@@ -241,12 +247,13 @@ function ResupplyHealthSurround(heroArray, team)
 				if (actor.team == team) then
 					actor.ResupplyHealth()
 				end
+				coroutine.yield()
 			end
 		end
 	end
 end
 
-function ResupplyAmmoSurround(heroArray, team)
+function TeamHeroes:ResupplyAmmoSurround(heroArray, team)
 	for i,hero in ipairs(heroArray) do
 		-- check if hero is dead
 		-- NOTE: body still stays around after killed
@@ -258,12 +265,13 @@ function ResupplyAmmoSurround(heroArray, team)
 				if (actor.team == team) then
 					actor.ResupplyAmmo()
 				end
+				coroutine.yield()
 			end
 		end
 	end
 end
 
-function DamageSurround(heroArray, team)
+function TeamHeroes:DamageSurround(heroArray, team)
 	for i,hero in ipairs(heroArray) do
 		-- check if hero is dead
 		-- NOTE: body still stays around after killed
@@ -277,45 +285,57 @@ function DamageSurround(heroArray, team)
 					heroDamage.direction =  actor.position - hero.position
 					actor.Damage(hero, heroDamage)
 				end
+				coroutine.yield()
 			end
 		end
 	end
 end
 
 function TeamHeroes:RecruitAlly(squad)
+	-- check if recruit is disabled
+	if (isDisableRecruit) then
+		return
+	end
+	
 	-- Get team and team's heroArray
 	local team = squad.leader.team
 	local heroArray = {}
+	local heroDict = {}
 	if (team == Team.Blue) then
 		heroArray = heroBlueArray
+		heroDict = heroBlueDict
 	else
 		heroArray = heroRedArray
+		heroDict = heroRedDict
 	end
 
 	-- check if squad contains a hero
 	local isHeroSquad = false
-	for i,hero in ipairs(heroArray) do
-		local squadArray = squad.members
-		for j,actor in ipairs(squadArray) do
-			if (actor == hero) then
-				isHeroSquad = true
-				break
-			end
+	for i,actor in ipairs(squad.members) do
+		if (heroDict[actor] == actor) then
+			isHeroSquad = true
+			break
 		end
 	end
 
+	-- exit if not a hero squad
+	if not (isHeroSquad) then
+		return
+	end
+
 	-- recruit nearby soldiers
-	if (isHeroSquad) then
-		local actorsArray = ActorManager.AliveActorsInRange(squad.leader.position, recruitRange)
-		for i,actor in ipairs(actorsArray) do
-			if ((#squad.members < recruitAmount) and (actor.team == team) and (actor ~= Player.actor)) then
-				squad.AddMember(actor)
-			end
+	local actorsArray = ActorManager.AliveActorsInRange(squad.leader.position, recruitRange)
+	for i,actor in ipairs(actorsArray) do
+		if ((#squad.members < recruitAmount) and (actor.team == team) and (actor ~= Player.actor)) then
+			squad.AddMember(actor)
+		end
+		if (#squad.members >= recruitAmount) then
+			break
 		end
 	end
 end
 
-function setConfigurationVariables()
+function TeamHeroes:setConfigurationVariables()
 	local configChoice = mutatorScript.GetConfigurationDropdown("isPercentConfig")
 	if (configChoice == 0) then
 		isPercentConfig = false
@@ -369,85 +389,113 @@ function setConfigurationVariables()
 	recruitAmount = mutatorScript.GetConfigurationInt("recruitAmount")
 end
 
+function TeamHeroes:OverhealStartBlue()
+	while not (isDisableOverheal) do
+		self:OverhealAlly(heroBlueArray, Team.Blue, allyBlueInitHealthDict)
+		coroutine.yield(WaitForSeconds(overhealTime))
+	end
+end
+
+function TeamHeroes:OverhealStartRed()
+	while not (isDisableOverheal) do
+		self:OverhealAlly(heroRedArray, Team.Red, allyRedInitHealthDict)
+		coroutine.yield(WaitForSeconds(overhealTime))
+	end
+end
+
+function TeamHeroes:ResupplyHealthStartBlue()
+	while not (isDisableResupplyHealth) do
+		self:ResupplyHealthSurround(heroBlueArray, Team.Blue)
+		coroutine.yield(WaitForSeconds(resupplyTimeHealth))
+	end
+end
+
+function TeamHeroes:ResupplyHealthStartRed()
+	while not (isDisableResupplyHealth) do
+		self:ResupplyHealthSurround(heroRedArray, Team.Red)
+		coroutine.yield(WaitForSeconds(resupplyTimeHealth))
+	end
+end
+
+function TeamHeroes:ResupplyAmmoStartBlue()
+	while not (isDisableResupplyAmmo) do
+		self:ResupplyAmmoSurround(heroBlueArray, Team.Blue)
+		coroutine.yield(WaitForSeconds(resupplyTimeAmmo))
+	end
+end
+
+function TeamHeroes:ResupplyAmmoStartRed()
+	while not (isDisableResupplyAmmo) do
+		self:ResupplyAmmoSurround(heroRedArray, Team.Red)
+		coroutine.yield(WaitForSeconds(resupplyTimeAmmo))
+	end
+end
+
+function TeamHeroes:HeroDamageStartBlue()
+	while not (isDisableHeroDamage) do
+		self:DamageSurround(heroBlueArray, Team.Blue)
+		coroutine.yield(WaitForSeconds(damageTime))
+	end
+end
+
+function TeamHeroes:HeroDamageStartRed()
+	while not (isDisableHeroDamage) do
+		self:DamageSurround(heroRedArray, Team.Red)
+		coroutine.yield(WaitForSeconds(damageTime))
+	end
+end
+
 function TeamHeroes:Start()
 	-- clear variables
 	heroBlueArray = {}
 	heroRedArray = {}
-	stopwatchHealth = 0
-	stopwatchAmmo = 0
-	stopwatchDamage = 0
+	heroBlueDict = {}
+	heroRedDict = {}
 	flagPrefab = self.targets.flag
 	heroSkinBlue = self.targets.heroSkinBlue
 	heroSkinRed = self.targets.heroSkinRed
 	allyBlueInitHealthDict = {}
 	allyRedInitHealthDict = {}
-	stopwatchOverheal = 0
 
 	-- load user's settings
 	mutatorScript = self.script.mutator
-	setConfigurationVariables()
+	self:setConfigurationVariables()
 
 	-- make sure numbers are random
 	math.randomseed(Time.time)
 
 	-- initialize heroes
-	local actorBlueArray = ActorManager.GetActorsOnTeam(Team.Blue)
-	if (#actorBlueArray >= 1) then
-		initializeHero(heroBlueArray, numBlueHeroes, percentBlueHeroes, Team.Blue, Color.blue, heroSkinBlue)
-	end
-	local actorRedArray = ActorManager.GetActorsOnTeam(Team.Red)
-	if (#actorRedArray >= 1) then
-		initializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red, heroSkinRed)
-	end
+	self:initializeHero(heroBlueArray, numBlueHeroes, percentBlueHeroes, Team.Blue, Color.blue, heroSkinBlue, heroBlueDict)
+	self:initializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red, heroSkinRed, heroRedDict)
 
 	-- initialize health dictionary
-	initializeHealthDict(heroBlueArray, Team.Blue, allyBlueInitHealthDict)
-	initializeHealthDict(heroRedArray, Team.Red, allyRedInitHealthDict)
+	self:initializeHealthDict(heroBlueArray, Team.Blue, allyBlueInitHealthDict)
+	self:initializeHealthDict(heroRedArray, Team.Red, allyRedInitHealthDict)
+
+	--
+	-- GameEvents
+	--
 
 	-- recruit ally units
-	if not (isDisableRecruit) then
-		GameEvents.onSquadCreated.AddListener(self, "RecruitAlly")
-	end
-end
+	GameEvents.onSquadCreated.AddListener(self, "RecruitAlly")
 
-function TeamHeroes:Update()
+	--
+	-- Coroutines
+	--
+
 	-- overheal ally units
-	if not (isDisableOverheal) then
-		stopwatchOverheal = stopwatchOverheal + Time.deltaTime
-		if (stopwatchOverheal >= overhealTime) then
-			OverhealAlly(heroBlueArray, Team.Blue, allyBlueInitHealthDict)
-			OverhealAlly(heroRedArray, Team.Red, allyRedInitHealthDict)
-			stopwatchOverheal = 0
-		end
-	end
+	self.script.StartCoroutine("OverhealStartBlue")
+	self.script.StartCoroutine("OverhealStartRed")
 
 	-- resupply health to units around hero, including hero
-	if not (isDisableResupplyHealth) then
-		stopwatchHealth = stopwatchHealth + Time.deltaTime
-		if (stopwatchHealth >= resupplyTimeHealth) then
-			ResupplyHealthSurround(heroBlueArray, Team.Blue)
-			ResupplyHealthSurround(heroRedArray, Team.Red)
-			stopwatchHealth = 0
-		end
-	end
+	self.script.StartCoroutine("ResupplyHealthStartBlue")
+	self.script.StartCoroutine("ResupplyHealthStartRed")
 
 	-- resupply ammo to units around hero, including hero
-	if not (isDisableResupplyAmmo) then
-		stopwatchAmmo = stopwatchAmmo + Time.deltaTime
-		if (stopwatchAmmo >= resupplyTimeAmmo) then
-			ResupplyAmmoSurround(heroBlueArray, Team.Blue)
-			ResupplyAmmoSurround(heroRedArray, Team.Red)
-			stopwatchAmmo = 0
-		end
-	end
+	self.script.StartCoroutine("ResupplyAmmoStartBlue")
+	self.script.StartCoroutine("ResupplyAmmoStartRed")
 
 	-- damage units around hero
-	if not (isDisableHeroDamage) then
-		stopwatchDamage = stopwatchDamage + Time.deltaTime
-		if (stopwatchDamage >= damageTime) then
-			DamageSurround(heroBlueArray, Team.Blue)
-			DamageSurround(heroRedArray, Team.Red)
-			stopwatchDamage = 0
-		end
-	end
+	self.script.StartCoroutine("HeroDamageStartBlue")
+	self.script.StartCoroutine("HeroDamageStartRed")
 end
