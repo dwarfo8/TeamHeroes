@@ -51,6 +51,7 @@ local mutatorScript = nil
 local allyBlueInitHealthDict = {}
 local allyRedInitHealthDict = {}
 local overhealTime = 1
+local isPlayerHeroSelected = false
 
 function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroDict)
 	-- get actors on team
@@ -94,6 +95,7 @@ function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, te
 
 	-- create random non-repeating array
 	local randNonRepeatArray = {}
+
 	-- automatically add player to array if specified
 	if (isPlayerAlwaysHero and (Player.actor.team == team)) then
 		for i,actor in ipairs(actorArray) do
@@ -159,16 +161,37 @@ function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, te
 			heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material.color = teamColor		-- cloth physics flag
 		end
 
-		-- set material to hero skin
+		-- hero model mesh
+		local heroModelMesh = heroSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
+		local heroModelMaterial = heroSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
+
+		-- change hero skin
 		if not (isDisableSkin) then
 			if (heroArray[#heroArray] ~= Player.actor) then
-				-- player skin
-				heroArray[#heroArray].transform.GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- soldier model
-				heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- ragdoll model
-			else
 				-- bot skin
-				heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- soldier model
-				heroArray[#heroArray].transform.GetChild(2).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- ragdoll model
+				-- soldier model
+				local heroSoldierSMR = heroArray[#heroArray].transform.GetChild(0).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+				heroSoldierSMR.sharedMesh = heroModelMesh
+				heroSoldierSMR.sharedMaterials = heroModelMaterial
+				-- ragdoll model
+				local heroRagdollSMR = heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+				heroRagdollSMR.sharedMesh = heroModelMesh
+				heroRagdollSMR.sharedMaterials = heroModelMaterial
+			else
+				-- player skin
+				-- soldier model
+				local heroSoldierSMR = heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+				heroSoldierSMR.sharedMesh = heroModelMesh
+				heroSoldierSMR.sharedMaterials = heroModelMaterial
+				-- ragdoll model
+				local heroRagdollSMR = heroArray[#heroArray].transform.GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+				heroRagdollSMR.sharedMesh = heroModelMesh
+				heroRagdollSMR.sharedMaterials = heroModelMaterial
+				-- kickfoot model
+				local kickfootSMR = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(2).GetChild(1).gameObject.GetComponent(Renderer)
+				kickfootSMR.material.color = Color.green
+				-- assign correct hands skin on spawn
+				isPlayerHeroSelected = true
 			end
 		end
 	end
@@ -335,6 +358,30 @@ function TeamHeroes:RecruitAlly(squad)
 	end
 end
 
+function TeamHeroes:HeroSkinHands(actor)
+	-- check if skin is disabled
+	if (isDisableSkin) then
+		return
+	end
+
+	-- apply hands skin to hero player
+	if (actor == Player.actor and isPlayerHeroSelected) then
+		local weaponParentTrans = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(1).GetChild(0)
+		numEquipment = weaponParentTrans.childCount - 1
+		for i = 0,numEquipment,1 do
+			-- find skinned mesh renderer gameobject
+			local numWeaponChildren = weaponParentTrans.GetChild(i).childCount -1
+			for j = 0,numWeaponChildren,1 do
+				local handsSMR = weaponParentTrans.GetChild(i).GetChild(j).gameObject.GetComponent(SkinnedMeshRenderer)
+				if (handsSMR ~= nil) then
+					handsSMR.material.color = Color.green
+					break
+				end
+			end
+		end
+	end
+end
+
 function TeamHeroes:setConfigurationVariables()
 	local configChoice = mutatorScript.GetConfigurationDropdown("isPercentConfig")
 	if (configChoice == 0) then
@@ -456,6 +503,7 @@ function TeamHeroes:Start()
 	heroSkinRed = self.targets.heroSkinRed
 	allyBlueInitHealthDict = {}
 	allyRedInitHealthDict = {}
+	isPlayerHeroSelected = false
 
 	-- load user's settings
 	mutatorScript = self.script.mutator
@@ -478,6 +526,9 @@ function TeamHeroes:Start()
 
 	-- recruit ally units
 	GameEvents.onSquadCreated.AddListener(self, "RecruitAlly")
+
+	-- apply skin to hero player arms
+	GameEvents.onActorSpawn.AddListener(self, "HeroSkinHands")
 
 	--
 	-- Coroutines
