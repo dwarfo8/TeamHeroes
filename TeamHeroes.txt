@@ -296,6 +296,11 @@ function TeamHeroes:RecruitAlly(squad, order)
 	if (isDisableRecruit) then
 		return
 	end
+
+	-- exit if player squad
+	if (squad.leader == Player.actor) then
+		return
+	end
 	
 	-- Get team and team's heroArray
 	local team = squad.leader.team
