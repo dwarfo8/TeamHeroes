@@ -162,11 +162,11 @@ function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, te
 		-- set material to hero skin
 		if not (isDisableSkin) then
 			if (heroArray[#heroArray] ~= Player.actor) then
-				-- player skin
+				-- bot skin
 				heroArray[#heroArray].transform.GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- soldier model
 				heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- ragdoll model
 			else
-				-- bot skin
+				-- player skin
 				heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- soldier model
 				heroArray[#heroArray].transform.GetChild(2).GetChild(1).gameObject.GetComponent(Renderer).material = heroSkin	-- ragdoll model
 			end
@@ -291,8 +291,8 @@ function TeamHeroes:DamageSurround(heroArray, team)
 	end
 end
 
-function TeamHeroes:RecruitAlly(squad)
-	-- check if recruit is disabled
+function TeamHeroes:RecruitAlly(squad, order)
+	-- exit if recruit is disabled
 	if (isDisableRecruit) then
 		return
 	end
@@ -311,9 +311,11 @@ function TeamHeroes:RecruitAlly(squad)
 
 	-- check if squad contains a hero
 	local isHeroSquad = false
+	local curHero = nil
 	for i,actor in ipairs(squad.members) do
 		if (heroDict[actor] == actor) then
 			isHeroSquad = true
+			curHero = actor
 			break
 		end
 	end
@@ -323,13 +325,25 @@ function TeamHeroes:RecruitAlly(squad)
 		return
 	end
 
-	-- recruit nearby soldiers
+	-- get nearby actors
 	local actorsArray = ActorManager.AliveActorsInRange(squad.leader.position, recruitRange)
-	for i,actor in ipairs(actorsArray) do
-		if ((#squad.members < recruitAmount) and (actor.team == team) and (actor ~= Player.actor)) then
-			squad.AddMember(actor)
+
+	-- if squad is defending, add hero to a nearby squad that is attacking
+	if ((order ~= nil) and (order.type == OrderType.Defend)) then
+		for i,actor in ipairs(actorsArray) do
+			if ((actor.team == team) and (actor.squad.order ~= nil) and (actor.squad.order.type == OrderType.Attack)) then
+				actor.squad.AddMember(curHero)
+				break
+			end
 		end
-		if (#squad.members >= recruitAmount) then
+	end
+
+	-- recruit nearby soldiers
+	for i,actor in ipairs(actorsArray) do
+		if ((#curHero.squad.members < recruitAmount) and (actor.team == team) and (actor ~= Player.actor)) then
+			curHero.squad.AddMember(actor)
+		end
+		if (#curHero.squad.members >= recruitAmount) then
 			break
 		end
 	end
@@ -477,7 +491,7 @@ function TeamHeroes:Start()
 	--
 
 	-- recruit ally units
-	GameEvents.onSquadCreated.AddListener(self, "RecruitAlly")
+	GameEvents.onSquadAssignedNewOrder.AddListener(self, "RecruitAlly")
 
 	--
 	-- Coroutines
