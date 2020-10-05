@@ -52,6 +52,7 @@ local mutatorScript = nil
 local allyBlueInitHealthDict = {}
 local allyRedInitHealthDict = {}
 local overhealTime = 1
+local recruitTime = 1
 
 function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroDict)
 	-- get actors on team
@@ -293,10 +294,8 @@ function TeamHeroes:DamageSurround(heroArray, team)
 	end
 end
 
-function TeamHeroes:RecruitAllyHelper()
-	-- wait until squads are formed
-	coroutine.yield(WaitForSeconds(1))
 
+function TeamHeroes:RecruitAlly()
 	-- loop through all heroes
 	for i,hero in ipairs(heroAllArray) do
 		-- exit if hero squad doesn't exist
@@ -333,16 +332,6 @@ function TeamHeroes:RecruitAllyHelper()
 			coroutine.yield()
 		end
 	end
-end
-
-function TeamHeroes:RecruitAlly(spawnedActor)
-	-- exit if recruit is disabled
-	if (isDisableRecruit) then
-		return
-	end
-
-	-- start recruiting
-	self.script.StartCoroutine("RecruitAllyHelper")
 end
 
 function TeamHeroes:setConfigurationVariables()
@@ -455,6 +444,13 @@ function TeamHeroes:HeroDamageStartRed()
 	end
 end
 
+function TeamHeroes:RecruitAllyStart()
+	while not (isDisableRecruit) do
+		self:RecruitAlly()
+		coroutine.yield(WaitForSeconds(recruitTime))
+	end
+end
+
 function TeamHeroes:Start()
 	-- clear variables
 	heroBlueArray = {}
@@ -484,15 +480,11 @@ function TeamHeroes:Start()
 	self:initializeHealthDict(heroRedArray, Team.Red, allyRedInitHealthDict)
 
 	--
-	-- GameEvents
-	--
-
-	-- recruit ally units
-	GameEvents.onActorSpawn.AddListener(self, "RecruitAlly")
-
-	--
 	-- Coroutines
 	--
+
+	-- recruit allies
+	self.script.StartCoroutine("RecruitAllyStart")
 
 	-- overheal ally units
 	self.script.StartCoroutine("OverhealStartBlue")
