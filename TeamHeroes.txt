@@ -37,11 +37,12 @@ local overhealMax = 150							-- max overheal amount for allies
 
 local isDisableRecruit = false					-- disable ally recruit
 local recruitRange = 50							-- recruit range
-local recruitAmount = 4							-- number of allies that should be added to the hero's squad
+local recruitAmount = 5							-- number of units in the hero's squad
 
 -- private variables
 local heroBlueArray = {}
 local heroRedArray = {}
+local heroAllArray = {}
 local heroBlueDict = {}
 local heroRedDict = {}
 local flagPrefab = nil
@@ -129,6 +130,7 @@ function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, te
 		-- pick random actor as hero
 		local selectedHeroNum = table.remove(randNonRepeatArray, #randNonRepeatArray)
 		table.insert(heroArray, actorArray[selectedHeroNum])
+		table.insert(heroAllArray, actorArray[selectedHeroNum])
 		print("Index: " .. tostring(selectedHeroNum) .. " | Hero: " .. tostring(heroArray[#heroArray].name))
 
 		-- add to hero dict
@@ -291,67 +293,56 @@ function TeamHeroes:DamageSurround(heroArray, team)
 	end
 end
 
-function TeamHeroes:RecruitAlly(squad, order)
+function TeamHeroes:RecruitAllyHelper()
+	-- wait until squads are formed
+	coroutine.yield(WaitForSeconds(1))
+
+	-- loop through all heroes
+	for i,hero in ipairs(heroAllArray) do
+		-- exit if hero squad doesn't exist
+		if (hero.squad == nil) then
+			return
+		end
+
+		-- get nearby actors
+		local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
+
+		-- if squad is not attacking, add hero to a nearby squad that is attacking
+		if ((hero.squad.order ~= nil) and (hero.squad.order.type ~= OrderType.Attack) and (hero.squad.leader ~= Player.actor)) then
+			for i,actor in ipairs(actorsArray) do
+				-- note: do not steal from player's squad
+				if ((actor.team == hero.team) and (actor.squad.order ~= nil) and (actor.squad.order.type == OrderType.Attack) and (actor.squad.leader ~= Player.actor)) then
+					actor.squad.AddMember(hero)
+					break
+				end
+				coroutine.yield()
+			end
+		end
+
+		-- recruit nearby soldiers
+		for i,actor in ipairs(actorsArray) do
+			if ((hero.squad ~= nil) and (actor.squad ~= nil)) then
+				-- note: do not steal from player's squad
+				if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor)) then
+					hero.squad.AddMember(actor)
+				end
+				if (#hero.squad.members >= recruitAmount) then
+					break
+				end
+			end
+			coroutine.yield()
+		end
+	end
+end
+
+function TeamHeroes:RecruitAlly(spawnedActor)
 	-- exit if recruit is disabled
 	if (isDisableRecruit) then
 		return
 	end
 
-	-- exit if player squad
-	if (squad.leader == Player.actor) then
-		return
-	end
-	
-	-- Get team and team's heroArray
-	local team = squad.leader.team
-	local heroArray = {}
-	local heroDict = {}
-	if (team == Team.Blue) then
-		heroArray = heroBlueArray
-		heroDict = heroBlueDict
-	else
-		heroArray = heroRedArray
-		heroDict = heroRedDict
-	end
-
-	-- check if squad contains a hero
-	local isHeroSquad = false
-	local curHero = nil
-	for i,actor in ipairs(squad.members) do
-		if (heroDict[actor] == actor) then
-			isHeroSquad = true
-			curHero = actor
-			break
-		end
-	end
-
-	-- exit if not a hero squad
-	if not (isHeroSquad) then
-		return
-	end
-
-	-- get nearby actors
-	local actorsArray = ActorManager.AliveActorsInRange(squad.leader.position, recruitRange)
-
-	-- if squad is defending, add hero to a nearby squad that is attacking
-	if ((order ~= nil) and (order.type == OrderType.Defend)) then
-		for i,actor in ipairs(actorsArray) do
-			if ((actor.team == team) and (actor.squad.order ~= nil) and (actor.squad.order.type == OrderType.Attack)) then
-				actor.squad.AddMember(curHero)
-				break
-			end
-		end
-	end
-
-	-- recruit nearby soldiers
-	for i,actor in ipairs(actorsArray) do
-		if ((#curHero.squad.members < recruitAmount) and (actor.team == team) and (actor ~= Player.actor)) then
-			curHero.squad.AddMember(actor)
-		end
-		if (#curHero.squad.members >= recruitAmount) then
-			break
-		end
-	end
+	-- start recruiting
+	self.script.StartCoroutine("RecruitAllyHelper")
 end
 
 function TeamHeroes:setConfigurationVariables()
@@ -468,6 +459,7 @@ function TeamHeroes:Start()
 	-- clear variables
 	heroBlueArray = {}
 	heroRedArray = {}
+	heroAllArray = {}
 	heroBlueDict = {}
 	heroRedDict = {}
 	flagPrefab = self.targets.flag
@@ -496,7 +488,7 @@ function TeamHeroes:Start()
 	--
 
 	-- recruit ally units
-	GameEvents.onSquadAssignedNewOrder.AddListener(self, "RecruitAlly")
+	GameEvents.onActorSpawn.AddListener(self, "RecruitAlly")
 
 	--
 	-- Coroutines
