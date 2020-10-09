@@ -48,6 +48,8 @@ local heroRedDict = {}
 local flagPrefab = nil
 local heroSkinBlue = nil
 local heroSkinRed = nil
+local heroSkinFpsBlue = nil
+local heroSkinFpsRed = nil
 local mutatorScript = nil
 local allyBlueInitHealthDict = {}
 local allyRedInitHealthDict = {}
@@ -55,7 +57,7 @@ local overhealTime = 1
 local recruitTime = 1
 local isPlayerHeroSelected = false
 
-function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroDict)
+function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroSkinFps, heroDict)
 	-- get actors on team
 	local actorArray = ActorManager.GetActorsOnTeam(team)
 
@@ -191,8 +193,8 @@ function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, te
 				heroRagdollSMR.sharedMesh = heroModelMesh
 				heroRagdollSMR.sharedMaterials = heroModelMaterial
 				-- kickfoot model
-				local kickfootSMR = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(2).GetChild(1).gameObject.GetComponent(Renderer)
-				kickfootSMR.material.color = Color.green
+				local kickfootSMR = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+				kickfootSMR.material = heroSkinFps
 				-- assign correct hands skin on spawn
 				isPlayerHeroSelected = true
 			end
@@ -318,7 +320,7 @@ function TeamHeroes:DamageSurround(heroArray, team)
 end
 
 
-function TeamHeroes:RecruitAlly()
+function TeamHeroes:AttackAndRecruitAlly()
 	-- loop through all heroes
 	for i,hero in ipairs(heroAllArray) do
 		-- exit if hero squad doesn't exist
@@ -341,6 +343,11 @@ function TeamHeroes:RecruitAlly()
 			end
 		end
 
+		-- check if recruit is on
+		if (isDisableRecruit) then
+			return
+		end
+
 		-- recruit nearby soldiers
 		for i,actor in ipairs(actorsArray) do
 			if ((hero.squad ~= nil) and (actor.squad ~= nil)) then
@@ -357,25 +364,36 @@ function TeamHeroes:RecruitAlly()
 	end
 end
 
-function TeamHeroes:HeroSkinHands(actor)
+function TeamHeroes:SetHeroSkinFps(actor)
 	-- check if skin is disabled
 	if (isDisableSkin) then
 		return
 	end
 
+	-- exit if not player
+	if ((actor ~= Player.actor) and (not isPlayerHeroSelected)) then
+		return
+	end
+
+	-- check if blue or red team
+	local heroSkinFps = nil
+	if (Player.team == Team.blue) then
+		heroSkinFps = heroSkinFpsBlue
+	else
+		heroSkinFps = heroSkinFpsRed
+	end
+
 	-- apply hands skin to hero player
-	if (actor == Player.actor and isPlayerHeroSelected) then
-		local weaponParentTrans = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(1).GetChild(0)
-		numEquipment = weaponParentTrans.childCount - 1
-		for i = 0,numEquipment,1 do
-			-- find skinned mesh renderer gameobject
-			local numWeaponChildren = weaponParentTrans.GetChild(i).childCount -1
-			for j = 0,numWeaponChildren,1 do
-				local handsSMR = weaponParentTrans.GetChild(i).GetChild(j).gameObject.GetComponent(SkinnedMeshRenderer)
-				if (handsSMR ~= nil) then
-					handsSMR.material.color = Color.green
-					break
-				end
+	local weaponParentTrans = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(1).GetChild(0)
+	numEquipment = weaponParentTrans.childCount - 1
+	for i = 0,numEquipment,1 do
+		-- find skinned mesh renderer gameobject
+		local numWeaponChildren = weaponParentTrans.GetChild(i).childCount -1
+		for j = 0,numWeaponChildren,1 do
+			local handsSMR = weaponParentTrans.GetChild(i).GetChild(j).gameObject.GetComponent(SkinnedMeshRenderer)
+			if (handsSMR ~= nil) then
+				handsSMR.material = heroSkinFps
+				break
 			end
 		end
 	end
@@ -491,9 +509,9 @@ function TeamHeroes:HeroDamageStartRed()
 	end
 end
 
-function TeamHeroes:RecruitAllyStart()
-	while not (isDisableRecruit) do
-		self:RecruitAlly()
+function TeamHeroes:AttackAndRecruitAllyStart()
+	while (true) do
+		self:AttackAndRecruitAlly()
 		coroutine.yield(WaitForSeconds(recruitTime))
 	end
 end
@@ -508,6 +526,8 @@ function TeamHeroes:Start()
 	flagPrefab = self.targets.flag
 	heroSkinBlue = self.targets.heroSkinBlue
 	heroSkinRed = self.targets.heroSkinRed
+	heroSkinFpsBlue = self.targets.heroSkinFpsBlue
+	heroSkinFpsRed = self.targets.heroSkinFpsRed
 	allyBlueInitHealthDict = {}
 	allyRedInitHealthDict = {}
 	isPlayerHeroSelected = false
@@ -520,8 +540,8 @@ function TeamHeroes:Start()
 	math.randomseed(Time.time)
 
 	-- initialize heroes
-	self:initializeHero(heroBlueArray, numBlueHeroes, percentBlueHeroes, Team.Blue, Color.blue, heroSkinBlue, heroBlueDict)
-	self:initializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red, heroSkinRed, heroRedDict)
+	self:initializeHero(heroBlueArray, numBlueHeroes, percentBlueHeroes, Team.Blue, Color.blue, heroSkinBlue, heroSkinFpsBlue, heroBlueDict)
+	self:initializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red, heroSkinRed, heroSkinFpsRed, heroRedDict)
 
 	-- initialize health dictionary
 	self:initializeHealthDict(heroBlueArray, Team.Blue, allyBlueInitHealthDict)
@@ -531,15 +551,15 @@ function TeamHeroes:Start()
 	-- GameEvents
 	--
 
-	-- apply skin to hero player arms
-	GameEvents.onActorSpawn.AddListener(self, "HeroSkinHands")
+	-- apply skin to hero player arms and feet
+	GameEvents.onActorSpawn.AddListener(self, "SetHeroSkinFps")
 
 	--
 	-- Coroutines
 	--
 
 	-- recruit allies
-	self.script.StartCoroutine("RecruitAllyStart")
+	self.script.StartCoroutine("AttackAndRecruitAllyStart")
 
 	-- overheal ally units
 	self.script.StartCoroutine("OverhealStartBlue")
