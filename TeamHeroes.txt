@@ -55,7 +55,6 @@ local allyBlueInitHealthDict = {}
 local allyRedInitHealthDict = {}
 local overhealTime = 1
 local recruitTime = 1
-local isPlayerHeroSelected = false
 
 function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroSkinFps, heroDict)
 	-- get actors on team
@@ -195,8 +194,6 @@ function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, te
 				-- kickfoot model
 				local kickfootSMR = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
 				kickfootSMR.material = heroSkinFps
-				-- assign correct hands skin on spawn
-				isPlayerHeroSelected = true
 			end
 		end
 	end
@@ -371,7 +368,17 @@ function TeamHeroes:SetHeroSkinFps(actor)
 	end
 
 	-- exit if not player
-	if ((actor ~= Player.actor) and (not isPlayerHeroSelected)) then
+	if (actor ~= Player.actor) then
+		return
+	end
+
+	-- exit if player is not hero
+	if (Player.team == Team.blue) then
+		heroDict = heroBlueDict
+	else
+		heroDict = heroRedDict
+	end
+	if (heroDict[Player.actor] == nil) then
 		return
 	end
 
@@ -530,7 +537,6 @@ function TeamHeroes:Start()
 	heroSkinFpsRed = self.targets.heroSkinFpsRed
 	allyBlueInitHealthDict = {}
 	allyRedInitHealthDict = {}
-	isPlayerHeroSelected = false
 
 	-- load user's settings
 	mutatorScript = self.script.mutator
