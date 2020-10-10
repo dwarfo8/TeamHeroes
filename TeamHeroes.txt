@@ -329,7 +329,7 @@ function TeamHeroes:AttackAndRecruitAlly()
 	for i,hero in ipairs(heroAllArray) do
 		-- exit if hero squad doesn't exist
 		if (hero.squad == nil) then
-			return
+			break
 		end
 
 		-- get nearby actors
@@ -349,7 +349,7 @@ function TeamHeroes:AttackAndRecruitAlly()
 
 		-- check if recruit is on
 		if (isDisableRecruit) then
-			return
+			break
 		end
 
 		-- check if any hero squad members are seated already
