@@ -29,6 +29,7 @@ local damageAmount = 10							-- damage amount to surrounding units
 
 local flagScale = 1								-- size of the flag
 local isDisableFlag = false						-- disables hero flag
+local isShowFlagVehicle = false					-- only shows flag when hero is in vehicle
 local isDisableSkin = false						-- disables hero skin
 
 local isDisableOverheal = false					-- disable ally overheal
@@ -55,6 +56,7 @@ local allyBlueInitHealthDict = {}
 local allyRedInitHealthDict = {}
 local overhealTime = 1
 local recruitTime = 1
+local flagVehicleTime = 1
 
 function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroSkinFps, heroDict)
 	-- get actors on team
@@ -361,33 +363,40 @@ function TeamHeroes:AttackAndRecruitAlly()
 	end
 end
 
-function TeamHeroes:SetHeroSkinFps(actor)
-	-- check if skin is disabled
-	if (isDisableSkin) then
-		return
+function TeamHeroes:FlagVisibility()
+	-- loop through all heroes
+	for i,hero in ipairs(heroAllArray) do
+		-- check if player
+		if (hero == Player.actor) then
+			-- check if player is seated
+			if (hero.isSeated) then
+				hero.transform.GetChild(4).gameObject.SetActive(true)
+			else
+				hero.transform.GetChild(4).gameObject.SetActive(false)
+			end
+		else
+			-- check if bot seated
+			if (hero.isSeated) then
+				hero.transform.GetChild(3).gameObject.SetActive(true)
+			else
+				hero.transform.GetChild(3).gameObject.SetActive(false)
+			end
+		end
 	end
+end
 
-	-- exit if not player
-	if (actor ~= Player.actor) then
-		return
-	end
-
-	-- exit if player is not hero
-	if (Player.team == Team.blue) then
-		heroDict = heroBlueDict
-	else
-		heroDict = heroRedDict
-	end
-	if (heroDict[Player.actor] == nil) then
-		return
-	end
-
+function TeamHeroes:SetHeroSkinFps()
 	-- check if blue or red team
 	local heroSkinFps = nil
 	if (Player.team == Team.blue) then
 		heroSkinFps = heroSkinFpsBlue
 	else
 		heroSkinFps = heroSkinFpsRed
+	end
+
+	-- wait for weapon models to load
+	while (GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).childCount == 1) do
+		coroutine.yield(WaitForSeconds(0.1))
 	end
 
 	-- apply hands skin to hero player
@@ -448,7 +457,19 @@ function TeamHeroes:setConfigurationVariables()
 	damageAmount = mutatorScript.GetConfigurationInt("damageAmount")
 
 	flagScale = mutatorScript.GetConfigurationFloat("flagScale")
-	isDisableFlag = mutatorScript.GetConfigurationBool("isDisableFlag")
+
+	isShowFlag = mutatorScript.GetConfigurationDropdown("isShowFlag")
+	if (isShowFlag == 0) then
+		isDisableFlag = false
+		isShowFlagVehicle = false
+	elseif (isShowFlag == 1) then
+		isDisableFlag = true
+		isShowFlagVehicle = false
+	else
+		isDisableFlag = false
+		isShowFlagVehicle = true
+	end
+
 	isDisableSkin = mutatorScript.GetConfigurationBool("isDisableSkin")
 
 	isDisableOverheal = mutatorScript.GetConfigurationBool("isDisableOverheal")
@@ -523,6 +544,37 @@ function TeamHeroes:AttackAndRecruitAllyStart()
 	end
 end
 
+function TeamHeroes:FlagVisibilityStart()
+	while (isShowFlagVehicle and (not isDisableFlag)) do
+		self:FlagVisibility()
+		coroutine.yield(WaitForSeconds(flagVehicleTime))
+	end
+end
+
+function TeamHeroes:SetHeroSkinFpsStart(actor)
+	-- exit if skin is disabled
+	if (isDisableSkin) then
+		return
+	end
+
+	-- exit if not player
+	if (actor ~= Player.actor) then
+		return
+	end
+
+	-- exit if player is not hero
+	if (Player.team == Team.blue) then
+		heroDict = heroBlueDict
+	else
+		heroDict = heroRedDict
+	end
+	if (heroDict[Player.actor] == nil) then
+		return
+	end
+
+	self.script.StartCoroutine("SetHeroSkinFps")
+end
+
 function TeamHeroes:Start()
 	-- clear variables
 	heroBlueArray = {}
@@ -558,7 +610,7 @@ function TeamHeroes:Start()
 	--
 
 	-- apply skin to hero player arms and feet
-	GameEvents.onActorSpawn.AddListener(self, "SetHeroSkinFps")
+	GameEvents.onActorSpawn.AddListener(self, "SetHeroSkinFpsStart")
 
 	--
 	-- Coroutines
@@ -582,4 +634,7 @@ function TeamHeroes:Start()
 	-- damage units around hero
 	self.script.StartCoroutine("HeroDamageStartBlue")
 	self.script.StartCoroutine("HeroDamageStartRed")
+
+	-- flag visibility
+	self.script.StartCoroutine("FlagVisibilityStart")
 end
