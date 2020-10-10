@@ -57,7 +57,7 @@ local mutatorScript = nil
 local allyBlueInitHealthDict = {}
 local allyRedInitHealthDict = {}
 local overhealTime = 1
-local recruitTime = 3
+local recruitTime = 1
 local flagVehicleTime = 1
 local heroSquadDict = {}
 local heroSquadUpdateTime = 1
@@ -339,7 +339,7 @@ function TeamHeroes:AttackAndRecruitAlly()
 		if ((hero.squad.order ~= nil) and (hero.squad.order.type ~= OrderType.Attack) and (hero.squad.leader ~= Player.actor)) then
 			for i,actor in ipairs(actorsArray) do
 				-- note: do not steal from player's squad
-				if ((actor.team == hero.team) and (actor.squad.order ~= nil) and (actor.squad.order.type == OrderType.Attack) and (actor.squad.leader ~= Player.actor) and (hero.isSeated == false) and (hero.activeVehicle == nil)) then
+				if ((actor.team == hero.team) and (actor.squad.order ~= nil) and (actor.squad.order.type == OrderType.Attack) and (actor.squad.leader ~= Player.actor) and (actor.isSeated == false) and (hero.squad.leader.isSeated == false)) then
 					actor.squad.AddMember(hero)
 					break
 				end
@@ -352,18 +352,31 @@ function TeamHeroes:AttackAndRecruitAlly()
 			return
 		end
 
+		-- check if any hero squad members are seated already
+		local heroSquadSeated = false
+		for i,actor in ipairs(hero.squad.members) do
+			if (actor.isSeated == true) then
+				heroSquadSeated = true
+				break
+			end
+			coroutine.yield()
+		end
+		if (heroSquadSeated) then
+			break
+		end
+
 		-- recruit nearby soldiers
 		for i,actor in ipairs(actorsArray) do
 			-- check if squads exists
 			if ((hero.squad ~= nil) and (actor.squad ~= nil)) then
 				-- recruit for player first
 				if (hero == Player.actor) then
-					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor) and (actor.isSeated == false) and (hero.activeVehicle == nil)) then
+					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor) and (actor.isSeated == false)) then
 						hero.squad.AddMember(actor)
 					end
 				else
 					-- note: do not steal from player's squad and do not steal from other hero's squad
-					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor) and (heroSquadDict[actor.squad.leader] == nil) and (actor.isSeated == false) and (hero.activeVehicle == nil)) then
+					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor) and (heroSquadDict[actor.squad.leader] == nil) and (actor.isSeated == false)) then
 						hero.squad.AddMember(actor)
 					end
 				end
