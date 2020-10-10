@@ -59,6 +59,8 @@ local allyRedInitHealthDict = {}
 local overhealTime = 1
 local recruitTime = 1
 local flagVehicleTime = 1
+local heroSquadDict = {}
+local heroSquadUpdateTime = 1
 
 function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroSkinFoot, heroDict)
 	-- get actors on team
@@ -142,7 +144,7 @@ function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, te
 		print("Index: " .. tostring(selectedHeroNum) .. " | Hero: " .. tostring(heroArray[#heroArray].name))
 
 		-- add to hero dict
-		heroDict[heroArray[#heroArray]] = heroArray[#heroArray]
+		heroDict[heroArray[#heroArray]] = true
 
 		-- set health for hero
 		heroArray[#heroArray].maxHealth = heroMaxHealth
@@ -352,10 +354,18 @@ function TeamHeroes:AttackAndRecruitAlly()
 
 		-- recruit nearby soldiers
 		for i,actor in ipairs(actorsArray) do
-			if ((hero.squad ~= nil) and (actor.squad ~= nil)) then
-				-- note: do not steal from player's squad
-				if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor)) then
-					hero.squad.AddMember(actor)
+			-- check if squads exists and the hero is not seated
+			if ((hero.squad ~= nil) and (actor.squad ~= nil) and (hero.isSeated == false)) then
+				-- recruit for player first
+				if (hero == Player.actor) then
+					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor)) then
+						hero.squad.AddMember(actor)
+					end
+				else
+					-- note: do not steal from player's squad and do not steal from other hero's squad
+					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor) and (heroSquadDict[actor.squad.leader] == nil)) then
+						hero.squad.AddMember(actor)
+					end
 				end
 				if (#hero.squad.members >= recruitAmount) then
 					break
@@ -580,6 +590,23 @@ function TeamHeroes:SetHeroSkinFpsStart(actor)
 	self.script.StartCoroutine("SetHeroSkinFps")
 end
 
+function TeamHeroes:UpdateHeroSquadDict()
+	while (true) do
+		-- loop through all heroes
+		for i,hero in ipairs(heroAllArray) do
+			if (hero.squad ~= nil) then
+				heroSquadDict[hero.squad.leader] = true
+			end
+			coroutine.yield()
+		end
+		coroutine.yield(WaitForSeconds(heroSquadUpdateTime))
+	end
+end
+
+function TeamHeroes:RemoveHeroSquadDict(actor)
+	heroSquadDict[actor] = nil
+end
+
 function TeamHeroes:Start()
 	-- clear variables
 	heroBlueArray = {}
@@ -596,6 +623,7 @@ function TeamHeroes:Start()
 	heroSkinFootRed = self.targets.heroSkinFootRed
 	allyBlueInitHealthDict = {}
 	allyRedInitHealthDict = {}
+	heroSquadDict = {}
 
 	-- load user's settings
 	mutatorScript = self.script.mutator
@@ -619,9 +647,15 @@ function TeamHeroes:Start()
 	-- apply skin to hero player arms and feet
 	GameEvents.onActorSpawn.AddListener(self, "SetHeroSkinFpsStart")
 
+	-- remove squad leader from hero dict if possible
+	GameEvents.onActorDied.AddListener(self, "RemoveHeroSquadDict")
+
 	--
 	-- Coroutines
 	--
+
+	-- update hero squad dictionary
+	self.script.StartCoroutine("UpdateHeroSquadDict")
 
 	-- recruit allies
 	self.script.StartCoroutine("AttackAndRecruitAllyStart")
