@@ -339,9 +339,11 @@ function TeamHeroes:AttackAndRecruitAlly()
 		if ((hero.squad.order ~= nil) and (hero.squad.order.type ~= OrderType.Attack) and (hero.squad.leader ~= Player.actor)) then
 			for i,actor in ipairs(actorsArray) do
 				-- note: do not steal from player's squad
-				if ((actor.team == hero.team) and (actor.squad.order ~= nil) and (actor.squad.order.type == OrderType.Attack) and (actor.squad.leader ~= Player.actor) and (actor.isSeated == false) and (hero.squad.leader.isSeated == false)) then
-					actor.squad.AddMember(hero)
-					break
+				if ((actor.squad ~= nil) and (hero.squad ~= nil)) then
+					if ((actor.team == hero.team) and (actor.squad.order ~= nil) and (actor.squad.order.type == OrderType.Attack) and (actor.squad.leader ~= Player.actor) and (actor.isSeated == false) and (hero.squad.leader.isSeated == false)) then
+						actor.squad.AddMember(hero)
+						break
+					end
 				end
 				coroutine.yield()
 			end
