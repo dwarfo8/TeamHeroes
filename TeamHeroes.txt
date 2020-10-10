@@ -12,7 +12,7 @@ local percentRedHeroes = 1						-- percent of heroes on red team
 local isDisablePlayerRandSelectHero = false 	-- lets the player be randomly selected as a hero, disabling this means player will never be chosen
 local isPlayerAlwaysHero = false				-- player will always start the game as a hero, overrides any other settings
 
-local heroMaxHealth = 300						-- game gives this amount of health to heroes when they are chosen
+local heroMaxHealth = 200						-- game gives this amount of health to heroes when they are chosen
 
 local isDisableResupplyHealth = false			-- disable health resupply
 local resupplyTimeHealth = 1					-- delay in seconds for health resupply around hero
@@ -25,7 +25,7 @@ local resupplyRangeAmmo = 20					-- game units of how far health resupplies arou
 local isDisableHeroDamage = false				-- disable hero proximity damage
 local damageTime = 1							-- delay in seconds for damage around hero
 local damageRange = 20							-- game units of how far units are damaged around hero
-local damageAmount = 10							-- damage amount to surrounding units
+local damageAmount = 5							-- damage amount to surrounding units
 
 local flagScale = 1								-- size of the flag
 local isDisableFlag = false						-- disables hero flag
@@ -49,8 +49,10 @@ local heroRedDict = {}
 local flagPrefab = nil
 local heroSkinBlue = nil
 local heroSkinRed = nil
-local heroSkinFpsBlue = nil
-local heroSkinFpsRed = nil
+local heroSkinHandsBlue = nil
+local heroSkinHandsRed = nil
+local heroSkinFootBlue = nil
+local heroSkinFootRed = nil
 local mutatorScript = nil
 local allyBlueInitHealthDict = {}
 local allyRedInitHealthDict = {}
@@ -58,7 +60,7 @@ local overhealTime = 1
 local recruitTime = 1
 local flagVehicleTime = 1
 
-function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroSkinFps, heroDict)
+function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroSkinFoot, heroDict)
 	-- get actors on team
 	local actorArray = ActorManager.GetActorsOnTeam(team)
 
@@ -195,7 +197,8 @@ function TeamHeroes:initializeHero(heroArray, numHeroes, percentHeroes, team, te
 				heroRagdollSMR.sharedMaterials = heroModelMaterial
 				-- kickfoot model
 				local kickfootSMR = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
-				kickfootSMR.material = heroSkinFps
+				kickfootSMR.sharedMesh = heroSkinFoot.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
+				kickfootSMR.sharedMaterials = heroSkinFoot.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
 			end
 		end
 	end
@@ -387,11 +390,12 @@ end
 
 function TeamHeroes:SetHeroSkinFps()
 	-- check if blue or red team
-	local heroSkinFps = nil
+	local heroSkinHands = nil
+	local heroSkinFoot = nil
 	if (Player.team == Team.blue) then
-		heroSkinFps = heroSkinFpsBlue
+		heroSkinHands = heroSkinHandsBlue
 	else
-		heroSkinFps = heroSkinFpsRed
+		heroSkinHands = heroSkinHandsRed
 	end
 
 	-- wait for weapon models to load
@@ -408,7 +412,8 @@ function TeamHeroes:SetHeroSkinFps()
 		for j = 0,numWeaponChildren,1 do
 			local handsSMR = weaponParentTrans.GetChild(i).GetChild(j).gameObject.GetComponent(SkinnedMeshRenderer)
 			if (handsSMR ~= nil) then
-				handsSMR.material = heroSkinFps
+				handsSMR.sharedMesh = heroSkinHands.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
+				handsSMR.sharedMaterials = heroSkinHands.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
 				break
 			end
 		end
@@ -585,8 +590,10 @@ function TeamHeroes:Start()
 	flagPrefab = self.targets.flag
 	heroSkinBlue = self.targets.heroSkinBlue
 	heroSkinRed = self.targets.heroSkinRed
-	heroSkinFpsBlue = self.targets.heroSkinFpsBlue
-	heroSkinFpsRed = self.targets.heroSkinFpsRed
+	heroSkinHandsBlue = self.targets.heroSkinHandsBlue
+	heroSkinHandsRed = self.targets.heroSkinHandsRed
+	heroSkinFootBlue = self.targets.heroSkinFootBlue
+	heroSkinFootRed = self.targets.heroSkinFootRed
 	allyBlueInitHealthDict = {}
 	allyRedInitHealthDict = {}
 
@@ -598,8 +605,8 @@ function TeamHeroes:Start()
 	math.randomseed(Time.time)
 
 	-- initialize heroes
-	self:initializeHero(heroBlueArray, numBlueHeroes, percentBlueHeroes, Team.Blue, Color.blue, heroSkinBlue, heroSkinFpsBlue, heroBlueDict)
-	self:initializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red, heroSkinRed, heroSkinFpsRed, heroRedDict)
+	self:initializeHero(heroBlueArray, numBlueHeroes, percentBlueHeroes, Team.Blue, Color.blue, heroSkinBlue, heroSkinFootBlue, heroBlueDict)
+	self:initializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red, heroSkinRed, heroSkinFootRed, heroRedDict)
 
 	-- initialize health dictionary
 	self:initializeHealthDict(heroBlueArray, Team.Blue, allyBlueInitHealthDict)

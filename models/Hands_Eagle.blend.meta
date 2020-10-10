@@ -1,58 +1,72 @@
 fileFormatVersion: 2
-guid: dd7965330269a7f4e8d3165648fe4455
-timeCreated: 1602306236
+guid: b18bdfad51ea5e94dadc9748c045f9a8
+timeCreated: 1602306232
 licenseType: Free
 ModelImporter:
   serializedVersion: 19
   fileIDToRecycleName:
-    100000: Arm_L_001
-    100002: Arm_L_002
-    100004: Arm_L_003
+    100000: Arm_L
+    100002: Arm_L_001
+    100004: Arm_R
     100006: Arm_R_001
-    100008: Arm_R_002
-    100010: Arm_R_003
-    100012: Armature
-    100014: Bone
-    100016: Bone_001
-    100018: Bone_002
-    100020: Bone_003
-    100022: Bone_004
-    100024: //RootNode
-    100026: Leg_L
-    100028: Leg_L_001
-    100030: Leg_L_002
-    100032: Leg_R
-    100034: Leg_R_001
-    100036: Leg_R_002
-    100038: Shoulder_L
-    100040: Shoulder_R
-    100042: Soldier
-    400000: Arm_L_001
-    400002: Arm_L_002
-    400004: Arm_L_003
+    100008: Armature
+    100010: Hand_L
+    100012: Hand_R
+    100014: Hands
+    100016: //RootNode
+    100018: Index_L
+    100020: Index_L_001
+    100022: Index_L_002
+    100024: Index_R
+    100026: Index_R_001
+    100028: Index_R_002
+    100030: Pinky_L
+    100032: Pinky_L_001
+    100034: Pinky_L_002
+    100036: Pinky_R
+    100038: Pinky_R_001
+    100040: Pinky_R_002
+    100042: Thumb_L
+    100044: Thumb_L_001
+    100046: Thumb_L_002
+    100048: Thumb_R
+    100050: Thumb_R_001
+    100052: Thumb_R_002
+    100054: Wrist_L
+    100056: Wrist_R
+    400000: Arm_L
+    400002: Arm_L_001
+    400004: Arm_R
     400006: Arm_R_001
-    400008: Arm_R_002
-    400010: Arm_R_003
-    400012: Armature
-    400014: Bone
-    400016: Bone_001
-    400018: Bone_002
-    400020: Bone_003
-    400022: Bone_004
-    400024: //RootNode
-    400026: Leg_L
-    400028: Leg_L_001
-    400030: Leg_L_002
-    400032: Leg_R
-    400034: Leg_R_001
-    400036: Leg_R_002
-    400038: Shoulder_L
-    400040: Shoulder_R
-    400042: Soldier
-    4300000: Soldier
+    400008: Armature
+    400010: Hand_L
+    400012: Hand_R
+    400014: Hands
+    400016: //RootNode
+    400018: Index_L
+    400020: Index_L_001
+    400022: Index_L_002
+    400024: Index_R
+    400026: Index_R_001
+    400028: Index_R_002
+    400030: Pinky_L
+    400032: Pinky_L_001
+    400034: Pinky_L_002
+    400036: Pinky_R
+    400038: Pinky_R_001
+    400040: Pinky_R_002
+    400042: Thumb_L
+    400044: Thumb_L_001
+    400046: Thumb_L_002
+    400048: Thumb_R
+    400050: Thumb_R_001
+    400052: Thumb_R_002
+    400054: Wrist_L
+    400056: Wrist_R
+    4300000: Hands
     7400000: Default Take
     9500000: //RootNode
-    13700000: Soldier
+    13700000: Hands
   materials:
     importMaterials: 1
     materialName: 0

@@ -1,58 +1,26 @@
 fileFormatVersion: 2
-guid: dd7965330269a7f4e8d3165648fe4455
-timeCreated: 1602306236
+guid: 17678e34483185e42a767f227f24fd4d
+timeCreated: 1602306223
 licenseType: Free
 ModelImporter:
   serializedVersion: 19
   fileIDToRecycleName:
-    100000: Arm_L_001
-    100002: Arm_L_002
-    100004: Arm_L_003
-    100006: Arm_R_001
-    100008: Arm_R_002
-    100010: Arm_R_003
-    100012: Armature
-    100014: Bone
-    100016: Bone_001
-    100018: Bone_002
-    100020: Bone_003
-    100022: Bone_004
-    100024: //RootNode
-    100026: Leg_L
-    100028: Leg_L_001
-    100030: Leg_L_002
-    100032: Leg_R
-    100034: Leg_R_001
-    100036: Leg_R_002
-    100038: Shoulder_L
-    100040: Shoulder_R
-    100042: Soldier
-    400000: Arm_L_001
-    400002: Arm_L_002
-    400004: Arm_L_003
-    400006: Arm_R_001
-    400008: Arm_R_002
-    400010: Arm_R_003
-    400012: Armature
-    400014: Bone
-    400016: Bone_001
-    400018: Bone_002
-    400020: Bone_003
-    400022: Bone_004
-    400024: //RootNode
-    400026: Leg_L
-    400028: Leg_L_001
-    400030: Leg_L_002
-    400032: Leg_R
-    400034: Leg_R_001
-    400036: Leg_R_002
-    400038: Shoulder_L
-    400040: Shoulder_R
-    400042: Soldier
-    4300000: Soldier
+    100000: Armature
+    100002: KickFoot
+    100004: //RootNode
+    100006: Leg_R
+    100008: Leg_R_001
+    100010: Leg_R_002
+    400000: Armature
+    400002: KickFoot
+    400004: //RootNode
+    400006: Leg_R
+    400008: Leg_R_001
+    400010: Leg_R_002
+    4300000: KickFoot
     7400000: Default Take
     9500000: //RootNode
-    13700000: Soldier
+    13700000: KickFoot
   materials:
     importMaterials: 1
     materialName: 0
