@@ -356,8 +356,9 @@ function TeamHeroes:AttackAndRecruitAlly()
 
 		-- check if any hero squad members are seated already
 		local heroSquadSeated = false
-		for i,actor in ipairs(hero.squad.members) do
-			if (actor.isSeated == true) then
+		local heroSquadMembers = hero.squad.members
+		for i,actor in ipairs(heroSquadMembers) do
+			if ((actor ~= nil) and (actor.isSeated == true)) then
 				heroSquadSeated = true
 				break
 			end
