@@ -300,7 +300,6 @@ function TeamHeroes:OverhealAlly(heroArray, team, allyInitHealthDict)
 				actor.ResupplyHealth()
 			end
 		end
-		coroutine.yield()
 	end
 end
 
