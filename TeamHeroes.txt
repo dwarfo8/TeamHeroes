@@ -43,10 +43,11 @@ local isEnableOptimize = false					-- average range and delay values
 
 local isDefaultSkin = true						-- use default hero skin
 local isCustomColorSkin = false					-- use custom color as hero skin
+local isCustomColorSkinNoHandFeet = false		-- use custom color for hero soldier skin only, ignore fps camera hands and feet
 local colorPatternEagle = 1						-- material index for color eagle
-local colorEagle = Color(0.25, 0.25, 1)				-- custom color to change on hero skin eagle
+local colorEagle = Color(0.25, 0.25, 1)			-- custom color to change on hero skin eagle
 local colorPatternRaven = 1						-- material index for color raven
-local colorRaven = Color(1, 0.25, 0.25)				-- custom color to change on hero skin raven
+local colorRaven = Color(1, 0.25, 0.25)			-- custom color to change on hero skin raven
 
 -- private variables
 local heroBlueArray = {}
@@ -276,8 +277,10 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 				local heroRagdollSMR = heroArray[#heroArray].transform.GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
 				heroRagdollSMR.materials[colorPattern].SetColor("_Color", customColor)
 				-- kickfoot model
-				local kickfootSMR = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
-				kickfootSMR.materials[colorPattern].SetColor("_Color", customColor)
+				if (isCustomColorSkin and not isCustomColorSkinNoHandFeet) then
+					local kickfootSMR = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+					kickfootSMR.materials[colorPattern].SetColor("_Color", customColor)
+				end
 			end
 		end
 		print("Index: " .. tostring(selectedHeroNum) .. " | Hero: " .. tostring(heroArray[#heroArray].name))
@@ -556,7 +559,7 @@ function TeamHeroes:SetHeroSkinFps()
 				if (isDefaultSkin) then
 					handsSMR.sharedMesh = heroSkinHands.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
 					handsSMR.sharedMaterials = heroSkinHands.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
-				else
+				elseif (isCustomColorSkin and not isCustomColorSkinNoHandFeet) then
 					handsSMR.materials[colorPattern].SetColor("_Color", customColor)
 				end
 				break
@@ -639,12 +642,19 @@ function TeamHeroes:setConfigurationVariables()
 	if (skinConfig == 0) then
 		isDefaultSkin = true
 		isCustomColorSkin = false
+		isCustomColorSkinNoHandFeet = false
 	elseif (skinConfig == 1) then
 		isDefaultSkin = false
 		isCustomColorSkin = true
+		isCustomColorSkinNoHandFeet = false
+	elseif (skinConfig == 2) then
+		isDefaultSkin = false
+		isCustomColorSkin = true
+		isCustomColorSkinNoHandFeet = true
 	else
 		isDefaultSkin = false
 		isCustomColorSkin = false
+		isCustomColorSkinNoHandFeet = false
 	end
 
 	colorPatternEagle = mutatorScript.GetConfigurationRange("colorPatternEagle")
