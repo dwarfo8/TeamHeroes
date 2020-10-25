@@ -30,7 +30,6 @@ local damageAmount = 5							-- damage amount to surrounding units
 local flagScale = 1								-- size of the flag
 local isDisableFlag = false						-- disables hero flag
 local isShowFlagVehicle = false					-- only shows flag when hero is in vehicle
-local isDisableSkin = false						-- disables hero skin
 
 local isDisableOverheal = false					-- disable ally overheal
 local overhealRange = 20						-- game units of how far units are affected by overheal around hero
@@ -39,6 +38,15 @@ local overhealMax = 150							-- max overheal amount for allies
 local isDisableRecruit = false					-- disable ally recruit
 local recruitRange = 20							-- recruit range
 local recruitAmount = 5							-- number of units in the hero's squad
+
+local isEnableOptimize = false					-- average range and delay values
+
+local isDefaultSkin = true						-- use default hero skin
+local isCustomColorSkin = false					-- use custom color as hero skin
+local colorPatternEagle = 1						-- material index for color eagle
+local colorEagle = Color(0.25, 0.25, 1)				-- custom color to change on hero skin eagle
+local colorPatternRaven = 1						-- material index for color raven
+local colorRaven = Color(1, 0.25, 0.25)				-- custom color to change on hero skin raven
 
 -- private variables
 local heroBlueArray = {}
@@ -61,10 +69,8 @@ local recruitTime = 1
 local flagVehicleTime = 1
 local heroSquadDict = {}
 local heroSquadUpdateTime = 1
-local isDisableOptimize = false
 local optimizeRange = 0
 local optimizeTime = 0
-local heroNearbyDict = {}
 
 function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroSkinFoot, heroDict)
 	-- get actors on team
@@ -139,13 +145,14 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 		end
 	end
 
+	local colorPatternInitialCheck = true
+
 	-- create hero array for team, setup health, flag, skin
 	for i=1,numHeroes,1 do
 		-- pick random actor as hero
 		local selectedHeroNum = table.remove(randNonRepeatArray, #randNonRepeatArray)
 		table.insert(heroArray, actorArray[selectedHeroNum])
 		table.insert(heroAllArray, actorArray[selectedHeroNum])
-		print("Index: " .. tostring(selectedHeroNum) .. " | Hero: " .. tostring(heroArray[#heroArray].name))
 
 		-- add to hero dict
 		heroDict[heroArray[#heroArray]] = true
@@ -180,7 +187,7 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 		local heroModelMaterial = heroSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
 
 		-- change hero skin
-		if not (isDisableSkin) then
+		if (isDefaultSkin) then
 			if (heroArray[#heroArray] ~= Player.actor) then
 				-- bot skin
 				-- soldier model
@@ -207,6 +214,73 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 				kickfootSMR.sharedMaterials = heroSkinFoot.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
 			end
 		end
+
+		-- set custom color
+		if (isCustomColorSkin) then
+			local colorPattern = nil
+			local customColor = nil
+			if (teamColor == Color.blue) then
+				colorPattern = colorPatternEagle
+				customColor = colorEagle
+			else
+				colorPattern = colorPatternRaven
+				customColor = colorRaven
+			end
+			if (heroArray[#heroArray] ~= Player.actor) then
+				-- bot skin
+				local heroSoldierSMR = heroArray[#heroArray].transform.GetChild(0).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+
+				-- check if out of range
+				if (colorPatternInitialCheck) then
+					print("Skin has " .. tostring(#heroSoldierSMR.materials) .. " color patterns")
+					if (colorPattern > #heroSoldierSMR.materials) then
+						print("Color pattern #" .. tostring(colorPattern) .. " out of index. Reverting to #1")
+						colorPattern = 1
+						if (teamColor == Color.blue) then
+							colorPatternEagle = 1
+						else
+							colorPatternRaven = 1
+						end
+					end
+					colorPatternInitialCheck = false
+				end
+
+				-- soldier model
+				heroSoldierSMR.materials[colorPattern].SetColor("_Color", customColor)
+				-- ragdoll model
+				local heroRagdollSMR = heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+				heroRagdollSMR.materials[colorPattern].SetColor("_Color", customColor)
+
+			else
+				-- player skin
+				local heroSoldierSMR = heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+
+				-- check if out of range
+				if (colorPatternInitialCheck) then
+					print("Skin has " .. tostring(#heroSoldierSMR.materials) .. " color patterns")
+					if (colorPattern > #heroSoldierSMR.materials) then
+						print("Color pattern #" .. tostring(colorPattern) .. " out of index. Reverting to #1")
+						colorPattern = 1
+						if (teamColor == Color.blue) then
+							colorPatternEagle = 1
+						else
+							colorPatternRaven = 1
+						end
+					end
+					colorPatternInitialCheck = false
+				end
+
+				-- soldier model
+				heroSoldierSMR.materials[colorPattern].SetColor("_Color", customColor)
+				-- ragdoll model
+				local heroRagdollSMR = heroArray[#heroArray].transform.GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+				heroRagdollSMR.materials[colorPattern].SetColor("_Color", customColor)
+				-- kickfoot model
+				local kickfootSMR = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
+				kickfootSMR.materials[colorPattern].SetColor("_Color", customColor)
+			end
+		end
+		print("Index: " .. tostring(selectedHeroNum) .. " | Hero: " .. tostring(heroArray[#heroArray].name))
 	end
 	print("----------")
 
@@ -237,8 +311,8 @@ function TeamHeroes:InitializeHealthDict(heroArray, team, allyInitHealthDict)
 end
 
 function TeamHeroes:OptimizeCalc()
-	-- check if optimize is enabled
-	if (isDisableOptimize) then
+	-- exit if optimize is disabled
+	if not (isEnableOptimize) then
 		return
 	end
 
@@ -271,15 +345,7 @@ function TeamHeroes:OverhealAlly(heroArray, team, allyInitHealthDict)
 		-- NOTE: body still stays around after killed
 		if not (hero.isDead) then
 			-- get nearby actors
-			local actorsArray = nil
-			if (isDisableOptimize) then
-				actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
-			else
-				actorsArray = heroNearbyDict[hero]
-				if (actorsArray == nil) then
-					break
-				end
-			end
+			local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
 
 			for j,actor in ipairs(actorsArray) do
 				-- check actor team color
@@ -309,15 +375,7 @@ function TeamHeroes:ResupplyHealthSurround(heroArray, team)
 		-- NOTE: body still stays around after killed
 		if not (hero.isDead) then
 			-- get nearby actors
-			local actorsArray = nil
-			if (isDisableOptimize) then
-				actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
-			else
-				actorsArray = heroNearbyDict[hero]
-				if (actorsArray == nil) then
-					break
-				end
-			end
+			local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
 
 			-- heal self and surrounding team
 			for j,actor in ipairs(actorsArray) do
@@ -337,15 +395,7 @@ function TeamHeroes:ResupplyAmmoSurround(heroArray, team)
 		-- NOTE: body still stays around after killed
 		if not (hero.isDead) then
 			-- get nearby actors
-			local actorsArray = nil
-			if (isDisableOptimize) then
-				actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
-			else
-				actorsArray = heroNearbyDict[hero]
-				if (actorsArray == nil) then
-					break
-				end
-			end
+			local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
 
 			-- ammo self and surrounding team
 			for j,actor in ipairs(actorsArray) do
@@ -365,15 +415,7 @@ function TeamHeroes:DamageSurround(heroArray, team)
 		-- NOTE: body still stays around after killed
 		if not (hero.isDead) then
 			-- get nearby actors
-			local actorsArray = nil
-			if (isDisableOptimize) then
-				actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
-			else
-				actorsArray = heroNearbyDict[hero]
-				if (actorsArray == nil) then
-					break
-				end
-			end
+			local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
 
 			-- damage nearby enemy team
 			for j,actor in ipairs(actorsArray) do
@@ -400,15 +442,7 @@ function TeamHeroes:AttackAndRecruitAlly()
 		end
 
 		-- get nearby actors
-		local actorsArray = nil
-		if (isDisableOptimize) then
-			actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
-		else
-			actorsArray = heroNearbyDict[hero]
-			if (actorsArray == nil) then
-				break
-			end
-		end
+		local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
 
 		-- if squad is not attacking, add hero to a nearby squad that is attacking
 		if ((hero.squad.order ~= nil) and (hero.squad.order.type ~= OrderType.Attack) and (hero.squad.leader ~= Player.actor)) then
@@ -494,10 +528,15 @@ function TeamHeroes:SetHeroSkinFps()
 	-- check if blue or red team
 	local heroSkinHands = nil
 	local heroSkinFoot = nil
+	local customColor = nil
 	if (Player.team == Team.blue) then
 		heroSkinHands = heroSkinHandsBlue
+		customColor = colorEagle
+		colorPattern = colorPatternEagle
 	else
 		heroSkinHands = heroSkinHandsRed
+		customColor = colorRaven
+		colorPattern = colorPatternRaven
 	end
 
 	-- wait for weapon models to load
@@ -514,8 +553,12 @@ function TeamHeroes:SetHeroSkinFps()
 		for j = 0,numWeaponChildren,1 do
 			local handsSMR = weaponParentTrans.GetChild(i).GetChild(j).gameObject.GetComponent(SkinnedMeshRenderer)
 			if (handsSMR ~= nil) then
-				handsSMR.sharedMesh = heroSkinHands.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
-				handsSMR.sharedMaterials = heroSkinHands.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
+				if (isDefaultSkin) then
+					handsSMR.sharedMesh = heroSkinHands.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
+					handsSMR.sharedMaterials = heroSkinHands.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
+				else
+					handsSMR.materials[colorPattern].SetColor("_Color", customColor)
+				end
 				break
 			end
 		end
@@ -577,8 +620,6 @@ function TeamHeroes:setConfigurationVariables()
 		isShowFlagVehicle = true
 	end
 
-	isDisableSkin = mutatorScript.GetConfigurationBool("isDisableSkin")
-
 	isDisableOverheal = mutatorScript.GetConfigurationBool("isDisableOverheal")
 	overhealRange = mutatorScript.GetConfigurationInt("overhealRange")
 	overhealMax = mutatorScript.GetConfigurationInt("overhealMax")
@@ -589,10 +630,34 @@ function TeamHeroes:setConfigurationVariables()
 
 	local isOptimizeConfig = mutatorScript.GetConfigurationDropdown("isOptimizeConfig")
 	if (isOptimizeConfig == 0) then
-		isDisableOptimize = false
+		isEnableOptimize = false
 	else
-		isDisableOptimize = true
+		isEnableOptimize = true
 	end
+
+	local skinConfig = mutatorScript.GetConfigurationDropdown("skinConfig")
+	if (skinConfig == 0) then
+		isDefaultSkin = true
+		isCustomColorSkin = false
+	elseif (skinConfig == 1) then
+		isDefaultSkin = false
+		isCustomColorSkin = true
+	else
+		isDefaultSkin = false
+		isCustomColorSkin = false
+	end
+
+	colorPatternEagle = mutatorScript.GetConfigurationRange("colorPatternEagle")
+	local colorRedEagle = mutatorScript.GetConfigurationRange("colorRedEagle")
+	local colorGreenEagle = mutatorScript.GetConfigurationRange("colorGreenEagle")
+	local colorBlueEagle = mutatorScript.GetConfigurationRange("colorBlueEagle")
+	colorEagle = Color(colorRedEagle / 100, colorGreenEagle / 100, colorBlueEagle / 100)
+
+	colorPatternRaven = mutatorScript.GetConfigurationRange("colorPatternRaven")
+	local colorRedRaven = mutatorScript.GetConfigurationRange("colorRedRaven")
+	local colorGreenRaven = mutatorScript.GetConfigurationRange("colorGreenRaven")
+	local colorBlueRaven = mutatorScript.GetConfigurationRange("colorBlueRaven")
+	colorRaven = Color(colorRedRaven / 100, colorGreenRaven / 100, colorBlueRaven / 100)
 end
 
 function TeamHeroes:OverhealStartBlue()
@@ -667,7 +732,7 @@ end
 
 function TeamHeroes:SetHeroSkinFpsStart(actor)
 	-- exit if skin is disabled
-	if (isDisableSkin) then
+	if not (isDefaultSkin or isCustomColorSkin) then
 		return
 	end
 
@@ -689,13 +754,53 @@ function TeamHeroes:SetHeroSkinFpsStart(actor)
 	self.script.StartCoroutine("SetHeroSkinFps")
 end
 
-function TeamHeroes:OptimizeUpdate()
-	-- exit if optimize is disabled
-	while not (isDisableOptimize) do
-		-- update global nearby actors
-		for i,hero in ipairs(heroAllArray) do
-			heroNearbyDict[hero] = ActorManager.AliveActorsInRange(hero.position, optimizeRange)
-			coroutine.yield()
+function TeamHeroes:OptimizeUpdateBlue()
+	while (true) do
+		-- loop through heroes
+		for i,hero in ipairs(heroBlueArray) do
+			-- get nearby actors
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, optimizeRange)
+			
+			-- heal self and surrounding team
+			for j,actor in ipairs(actorsArray) do
+				-- check actor team color
+				if (actor.team == Team.blue) then
+					actor.ResupplyHealth()
+					actor.ResupplyAmmo()
+				elseif (actor.team ~= team and ActorManager.ActorsCanSeeEachOther(hero, actor)) then
+					local heroDamage = DamageInfo()
+					heroDamage.healthDamage = damageAmount
+					heroDamage.direction =  actor.position - hero.position
+					actor.Damage(hero, heroDamage)
+				end
+				coroutine.yield()
+			end
+		end
+		coroutine.yield(WaitForSeconds(optimizeTime))
+	end
+end
+
+function TeamHeroes:OptimizeUpdateRed()
+	while (true) do
+		-- loop through heroes
+		for i,hero in ipairs(heroRedArray) do
+			-- get nearby actors
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, optimizeRange)
+			
+			-- heal self and surrounding team
+			for j,actor in ipairs(actorsArray) do
+				-- check actor team color
+				if (actor.team == Team.red) then
+					actor.ResupplyHealth()
+					actor.ResupplyAmmo()
+				elseif (actor.team ~= team and ActorManager.ActorsCanSeeEachOther(hero, actor)) then
+					local heroDamage = DamageInfo()
+					heroDamage.healthDamage = damageAmount
+					heroDamage.direction =  actor.position - hero.position
+					actor.Damage(hero, heroDamage)
+				end
+				coroutine.yield()
+			end
 		end
 		coroutine.yield(WaitForSeconds(optimizeTime))
 	end
@@ -737,7 +842,6 @@ function TeamHeroes:Start()
 	heroSquadDict = {}
 	optimizeRange = 0
 	optimizeTime = 0
-	heroNearbyDict = {}
 
 	-- load user's settings
 	mutatorScript = self.script.mutator
@@ -771,11 +875,11 @@ function TeamHeroes:Start()
 	-- Coroutines
 	--
 
-	-- update optimized values
-	self.script.StartCoroutine("OptimizeUpdate")
-
 	-- update hero squad dictionary
 	self.script.StartCoroutine("UpdateHeroSquadDict")
+
+	-- flag visibility
+	self.script.StartCoroutine("FlagVisibilityStart")
 
 	-- recruit allies
 	self.script.StartCoroutine("AttackAndRecruitAllyStart")
@@ -784,18 +888,22 @@ function TeamHeroes:Start()
 	self.script.StartCoroutine("OverhealStartBlue")
 	self.script.StartCoroutine("OverhealStartRed")
 
-	-- resupply health to units around hero, including hero
-	self.script.StartCoroutine("ResupplyHealthStartBlue")
-	self.script.StartCoroutine("ResupplyHealthStartRed")
+	if (isEnableOptimize) then
+		-- update optimized values
+		self.script.StartCoroutine("OptimizeUpdateBlue")
+		self.script.StartCoroutine("OptimizeUpdateRed")
+	else
 
-	-- resupply ammo to units around hero, including hero
-	self.script.StartCoroutine("ResupplyAmmoStartBlue")
-	self.script.StartCoroutine("ResupplyAmmoStartRed")
+		-- resupply health to units around hero, including hero
+		self.script.StartCoroutine("ResupplyHealthStartBlue")
+		self.script.StartCoroutine("ResupplyHealthStartRed")
 
-	-- damage units around hero
-	self.script.StartCoroutine("HeroDamageStartBlue")
-	self.script.StartCoroutine("HeroDamageStartRed")
+		-- resupply ammo to units around hero, including hero
+		self.script.StartCoroutine("ResupplyAmmoStartBlue")
+		self.script.StartCoroutine("ResupplyAmmoStartRed")
 
-	-- flag visibility
-	self.script.StartCoroutine("FlagVisibilityStart")
+		-- damage units around hero
+		self.script.StartCoroutine("HeroDamageStartBlue")
+		self.script.StartCoroutine("HeroDamageStartRed")
+	end
 end
