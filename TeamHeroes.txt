@@ -453,6 +453,7 @@ function TeamHeroes:AttackAndRecruitAlly()
 				-- note: do not steal from player's squad
 				if ((actor.squad ~= nil) and (hero.squad ~= nil)) then
 					if ((actor.team == hero.team) and (actor.squad.order ~= nil) and (actor.squad.order.type == OrderType.Attack) and (actor.squad.leader ~= Player.actor) and (actor.isSeated == false) and (hero.squad.leader.isSeated == false)) then
+						heroSquadDict[hero.squad.leader] = nil
 						actor.squad.AddMember(hero)
 						break
 					end
@@ -468,13 +469,14 @@ function TeamHeroes:AttackAndRecruitAlly()
 
 		-- check if any hero squad members are seated already
 		local heroSquadSeated = false
-		local heroSquadMembers = hero.squad.members
-		for i,actor in ipairs(heroSquadMembers) do
-			if ((actor ~= nil) and (actor.isSeated == true)) then
-				heroSquadSeated = true
-				break
+		if (hero.squad ~= nil) then
+			for i,actor in ipairs(hero.squad.members) do
+				if ((actor ~= nil) and (actor.isSeated == true)) then
+					heroSquadSeated = true
+					break
+				end
+				coroutine.yield()
 			end
-			coroutine.yield()
 		end
 		if (heroSquadSeated) then
 			break
