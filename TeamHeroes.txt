@@ -73,7 +73,7 @@ local heroSquadUpdateTime = 1
 local optimizeRange = 0
 local optimizeTime = 0
 
-function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, heroSkinFoot, heroDict)
+function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, teamColor, heroSkin, legSkin, heroDict)
 	-- get actors on team
 	local actorArray = ActorManager.GetActorsOnTeam(team)
 
@@ -183,36 +183,24 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 			heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material.color = teamColor		-- cloth physics flag
 		end
 
-		-- hero model mesh
-		local heroModelMesh = heroSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
-		local heroModelMaterial = heroSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
-
 		-- change hero skin
 		if (isDefaultSkin) then
-			if (heroArray[#heroArray] ~= Player.actor) then
-				-- bot skin
-				-- soldier model
-				local heroSoldierSMR = heroArray[#heroArray].transform.GetChild(0).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
-				heroSoldierSMR.sharedMesh = heroModelMesh
-				heroSoldierSMR.sharedMaterials = heroModelMaterial
-				-- ragdoll model
-				local heroRagdollSMR = heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
-				heroRagdollSMR.sharedMesh = heroModelMesh
-				heroRagdollSMR.sharedMaterials = heroModelMaterial
-			else
-				-- player skin
-				-- soldier model
-				local heroSoldierSMR = heroArray[#heroArray].transform.GetChild(1).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
-				heroSoldierSMR.sharedMesh = heroModelMesh
-				heroSoldierSMR.sharedMaterials = heroModelMaterial
-				-- ragdoll model
-				local heroRagdollSMR = heroArray[#heroArray].transform.GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
-				heroRagdollSMR.sharedMesh = heroModelMesh
-				heroRagdollSMR.sharedMaterials = heroModelMaterial
+			-- hero character model
+			local characterModelMesh = heroSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
+			local characterModelMaterial = heroSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
+			local characterMeshSkin = MeshSkin(characterModelMesh, characterModelMaterial, -1)
+
+			-- assign hero skin
+			local curHeroSkin = ActorSkin()
+			curHeroSkin.characterSkin = characterMeshSkin
+			-- TODO: Figure out how to apply kickLegSkin and armSkin with the API, doesn't work at the moment
+			heroArray[#heroArray].SetSkin(curHeroSkin)
+
+			if (heroArray[#heroArray] == Player.actor) then
 				-- kickfoot model
 				local kickfootSMR = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
-				kickfootSMR.sharedMesh = heroSkinFoot.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
-				kickfootSMR.sharedMaterials = heroSkinFoot.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
+				kickfootSMR.sharedMesh = legSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
+				kickfootSMR.sharedMaterials = legSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
 			end
 		end
 
@@ -444,22 +432,17 @@ function TeamHeroes:AttackAndRecruitAlly()
 			break
 		end
 
-		-- get nearby actors
-		local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
+		local allyTeam = Team.Blue
+		local enemyTeam = Team.Red
+		if (hero.team == Team.Red) then
+			allyTeam = Team.Red
+			enemyTeam = Team.Blue
+		end
 
-		-- if squad is not attacking, add hero to a nearby squad that is attacking
+		-- Make hero attack
 		if ((hero.squad.order ~= nil) and (hero.squad.order.type ~= OrderType.Attack) and (hero.squad.leader ~= Player.actor)) then
-			for i,actor in ipairs(actorsArray) do
-				-- note: do not steal from player's squad
-				if ((actor.squad ~= nil) and (hero.squad ~= nil)) then
-					if ((actor.team == hero.team) and (actor.squad.order ~= nil) and (actor.squad.order.type == OrderType.Attack) and (actor.squad.leader ~= Player.actor) and (actor.isSeated == false) and (hero.squad.leader.isSeated == false)) then
-						heroSquadDict[hero.squad.leader] = nil
-						actor.squad.AddMember(hero)
-						break
-					end
-				end
-				coroutine.yield()
-			end
+			local attackOrder = Order.Create(OrderType.Attack, ActorManager.RandomFrontlineSpawnPointForTeam(allyTeam), ActorManager.RandomFrontlineSpawnPointForTeam(enemyTeam))
+			hero.squad.AssignOrder(attackOrder)
 		end
 
 		-- check if recruit is on
@@ -467,20 +450,8 @@ function TeamHeroes:AttackAndRecruitAlly()
 			break
 		end
 
-		-- check if any hero squad members are seated already
-		local heroSquadSeated = false
-		if (hero.squad ~= nil) then
-			for i,actor in ipairs(hero.squad.members) do
-				if ((actor ~= nil) and (actor.isSeated == true)) then
-					heroSquadSeated = true
-					break
-				end
-				coroutine.yield()
-			end
-		end
-		if (heroSquadSeated) then
-			break
-		end
+		-- get nearby actors
+		local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
 
 		-- recruit nearby soldiers
 		for i,actor in ipairs(actorsArray) do
@@ -488,12 +459,12 @@ function TeamHeroes:AttackAndRecruitAlly()
 			if ((hero.squad ~= nil) and (actor.squad ~= nil)) then
 				-- recruit for player first
 				if (hero == Player.actor) then
-					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor) and (actor.isSeated == false)) then
+					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (not actor.aiController.hasTargetVehicle)) then
 						hero.squad.AddMember(actor)
 					end
 				else
 					-- note: do not steal from player's squad and do not steal from other hero's squad
-					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor) and (heroSquadDict[actor.squad.leader] == nil) and (actor.isSeated == false)) then
+					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor) and (heroSquadDict[actor.squad.leader] == nil) and (not actor.aiController.hasTargetVehicle)) then
 						hero.squad.AddMember(actor)
 					end
 				end
