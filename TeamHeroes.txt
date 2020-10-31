@@ -464,7 +464,7 @@ function TeamHeroes:AttackAndRecruitAlly()
 					end
 				else
 					-- note: do not steal from player's squad and do not steal from other hero's squad
-					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor) and (heroSquadDict[actor.squad.leader] == nil) and (not actor.aiController.hasTargetVehicle)) then
+					if ((#hero.squad.members < recruitAmount) and (actor.team == hero.team) and (actor ~= Player.actor) and (actor.squad.leader ~= Player.actor) and (heroSquadDict[actor.squad.leader] == nil) and (not actor.aiController.hasTargetVehicle) and (not hero.aiController.hasTargetVehicle)) then
 						hero.squad.AddMember(actor)
 					end
 				end
