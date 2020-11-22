@@ -278,9 +278,9 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 	return
 end
 
-function TeamHeroes:InitializeHealthDict(heroArray, team, allyInitHealthDict)
+function TeamHeroes:InitializeHealthDict(heroArray, allyTeam, allyInitHealthDict)
 	-- actors on team
-	local actorsArray = ActorManager.GetActorsOnTeam(team)
+	local actorsArray = ActorManager.GetActorsOnTeam(allyTeam)
 
 	-- create temp health dict
 	local tempInitHealthDict = {}
@@ -316,14 +316,11 @@ function TeamHeroes:OptimizeCalc()
 	local averageTime = (resupplyTimeAmmo + resupplyTimeHealth + damageTime) / 3
 	optimizeTime = averageTime
 	print("Optimize average delay (sec): " .. tostring(optimizeTime))
-	resupplyTimeAmmo = optimizeTime
-	resupplyTimeHealth = optimizeTime
-	damageTime = optimizeTime
 
 	print("----------")
 end
 
-function TeamHeroes:OverhealAlly(heroArray, team, allyInitHealthDict)
+function TeamHeroes:OverhealAlly(heroArray, allyTeam, allyInitHealthDict)
 	-- create copy of health dictionary for ally outside of range
 	local allyOutOfRangeHealthDict = {}
 	for i,j in pairs(allyInitHealthDict) do
@@ -336,11 +333,11 @@ function TeamHeroes:OverhealAlly(heroArray, team, allyInitHealthDict)
 		-- NOTE: body still stays around after killed
 		if not (hero.isDead) then
 			-- get nearby actors
-			local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, overhealRange)
 
 			for j,actor in ipairs(actorsArray) do
 				-- check actor team color
-				if (actor.team == team and allyInitHealthDict[actor] ~= nil) then
+				if (actor.team == allyTeam and allyInitHealthDict[actor] ~= nil) then
 					actor.maxHealth = overhealMax
 					allyOutOfRangeHealthDict[actor] = nil
 				end
@@ -366,7 +363,7 @@ function TeamHeroes:ResupplyHealthSurround(heroArray, team)
 		-- NOTE: body still stays around after killed
 		if not (hero.isDead) then
 			-- get nearby actors
-			local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, resupplyRangeHealth)
 
 			-- heal self and surrounding team
 			for j,actor in ipairs(actorsArray) do
@@ -386,7 +383,7 @@ function TeamHeroes:ResupplyAmmoSurround(heroArray, team)
 		-- NOTE: body still stays around after killed
 		if not (hero.isDead) then
 			-- get nearby actors
-			local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, resupplyTimeAmmo)
 
 			-- ammo self and surrounding team
 			for j,actor in ipairs(actorsArray) do
@@ -406,7 +403,7 @@ function TeamHeroes:DamageSurround(heroArray, team)
 		-- NOTE: body still stays around after killed
 		if not (hero.isDead) then
 			-- get nearby actors
-			local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, damageRange)
 
 			-- damage nearby enemy team
 			for j,actor in ipairs(actorsArray) do
@@ -451,7 +448,7 @@ function TeamHeroes:AttackAndRecruitAlly()
 		end
 
 		-- get nearby actors
-		local actorsArray = ActorManager.AliveActorsInRange(hero.squad.leader.position, recruitRange)
+		local actorsArray = ActorManager.AliveActorsInRange(hero.position, recruitRange)
 
 		-- recruit nearby soldiers
 		for i,actor in ipairs(actorsArray) do
@@ -643,6 +640,20 @@ function TeamHeroes:setConfigurationVariables()
 	colorRaven = Color(colorRedRaven / 100, colorGreenRaven / 100, colorBlueRaven / 100)
 end
 
+function TeamHeroes:OptimizeUpdateStartBlue()
+	while (isEnableOptimize) do
+		self:OptimizeUpdate(heroBlueArray, Team.Blue, allyBlueInitHealthDict)
+		coroutine.yield(WaitForSeconds(optimizeTime))
+	end
+end
+
+function TeamHeroes:OptimizeUpdateStartRed()
+	while (isEnableOptimize) do
+		self:OptimizeUpdate(heroRedArray, Team.Red, allyRedInitHealthDict)
+		coroutine.yield(WaitForSeconds(optimizeTime))
+	end
+end
+
 function TeamHeroes:OverhealStartBlue()
 	while not (isDisableOverheal) do
 		self:OverhealAlly(heroBlueArray, Team.Blue, allyBlueInitHealthDict)
@@ -733,50 +744,40 @@ function TeamHeroes:SetHeroSkinFpsStart(actor)
 	if (heroDict[Player.actor] == nil) then
 		return
 	end
-
+	
 	self.script.StartCoroutine("SetHeroSkinFps")
 end
 
-function TeamHeroes:OptimizeUpdateBlue()
-	while (true) do
-		-- loop through heroes
-		for i,hero in ipairs(heroBlueArray) do
-			-- get nearby actors
-			local actorsArray = ActorManager.AliveActorsInRange(hero.position, optimizeRange)
-			
-			-- heal self and surrounding team
-			for j,actor in ipairs(actorsArray) do
-				-- check actor team color
-				if (actor.team == Team.blue) then
-					actor.ResupplyHealth()
-					actor.ResupplyAmmo()
-				elseif (actor.team ~= team and ActorManager.ActorsCanSeeEachOther(hero, actor)) then
-					local heroDamage = DamageInfo()
-					heroDamage.healthDamage = damageAmount
-					heroDamage.direction =  actor.position - hero.position
-					actor.Damage(hero, heroDamage)
-				end
-				coroutine.yield()
-			end
+function TeamHeroes:OptimizeUpdate(heroArray, heroTeam, allyInitHealthDict)
+	-- create copy of health dictionary for ally outside of range
+	local allyOutOfRangeHealthDict = {}
+	if not (isDisableOverheal) then
+		for i,j in pairs(allyInitHealthDict) do
+			allyOutOfRangeHealthDict[i] = j
 		end
-		coroutine.yield(WaitForSeconds(optimizeTime))
 	end
-end
 
-function TeamHeroes:OptimizeUpdateRed()
-	while (true) do
-		-- loop through heroes
-		for i,hero in ipairs(heroRedArray) do
+	-- loop through heroes
+	for i,hero in ipairs(heroArray) do
+		if not (hero.isDead) then
 			-- get nearby actors
 			local actorsArray = ActorManager.AliveActorsInRange(hero.position, optimizeRange)
 			
 			-- heal self and surrounding team
 			for j,actor in ipairs(actorsArray) do
 				-- check actor team color
-				if (actor.team == Team.red) then
-					actor.ResupplyHealth()
-					actor.ResupplyAmmo()
-				elseif (actor.team ~= team and ActorManager.ActorsCanSeeEachOther(hero, actor)) then
+				if (actor.team == heroTeam) then
+					if ((not isDisableOverheal) and (allyInitHealthDict[actor] ~= nil)) then
+						actor.maxHealth = overhealMax
+						allyOutOfRangeHealthDict[actor] = nil
+					end
+					if not (isDisableResupplyHealth) then
+						actor.ResupplyHealth()
+					end
+					if not (isDisableResupplyAmmo) then
+						actor.ResupplyAmmo()
+					end
+				elseif ((not isDisableHeroDamage) and (actor.team ~= team) and (ActorManager.ActorsCanSeeEachOther(hero, actor))) then
 					local heroDamage = DamageInfo()
 					heroDamage.healthDamage = damageAmount
 					heroDamage.direction =  actor.position - hero.position
@@ -785,7 +786,18 @@ function TeamHeroes:OptimizeUpdateRed()
 				coroutine.yield()
 			end
 		end
-		coroutine.yield(WaitForSeconds(optimizeTime))
+	end
+
+	-- set to base health for ally out of range
+	if not (isDisableOverheal) then
+		for actor,initHealth in pairs(allyOutOfRangeHealthDict) do
+			if (initHealth ~= nil) then
+				actor.maxHealth = initHealth
+				if (actor.health > actor.maxHealth) then
+					actor.ResupplyHealth()
+				end
+			end
+		end
 	end
 end
 
@@ -867,15 +879,14 @@ function TeamHeroes:Start()
 	-- recruit allies
 	self.script.StartCoroutine("AttackAndRecruitAllyStart")
 
-	-- overheal ally units
-	self.script.StartCoroutine("OverhealStartBlue")
-	self.script.StartCoroutine("OverhealStartRed")
-
 	if (isEnableOptimize) then
 		-- update optimized values
-		self.script.StartCoroutine("OptimizeUpdateBlue")
-		self.script.StartCoroutine("OptimizeUpdateRed")
+		self.script.StartCoroutine("OptimizeUpdateStartBlue")
+		self.script.StartCoroutine("OptimizeUpdateStartRed")
 	else
+		-- overheal ally units
+		self.script.StartCoroutine("OverhealStartBlue")
+		self.script.StartCoroutine("OverhealStartRed")
 
 		-- resupply health to units around hero, including hero
 		self.script.StartCoroutine("ResupplyHealthStartBlue")
