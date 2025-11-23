@@ -165,7 +165,7 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 
 		-- set flag to hero
 		if not (isDisableFlag) then
-			flagPrefab.transform.GetChild(0).localScale = Vector3(flagScale, flagScale, flagScale)	-- scale flag
+			flagPrefab.transform.localScale = Vector3(flagScale, flagScale, flagScale)	-- scale flag
 			local heroFlag = GameObject.Instantiate(flagPrefab)
 			heroFlag.transform.SetParent(heroArray[#heroArray].transform)
 			-- flag position for bots and player
@@ -179,8 +179,8 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 				heroFlag.transform.rotation = PlayerCamera.fpCamera.gameObject.transform.GetChild(0).rotation
 			end
 			-- change flag color according to team
-			heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(0).gameObject.GetComponent(Renderer).material.color = teamColor		-- static flag
-			heroFlag.transform.GetChild(0).GetChild(1).GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material.color = teamColor		-- cloth physics flag
+			heroFlag.transform.GetChild(1).GetChild(0).GetChild(0).gameObject.GetComponent(Renderer).material.color = teamColor		-- static flag
+			heroFlag.transform.GetChild(1).GetChild(0).GetChild(1).gameObject.GetComponent(Renderer).material.color = teamColor		-- cloth physics flag
 		end
 
 		-- change hero skin
@@ -190,17 +190,47 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 			local characterModelMaterial = heroSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
 			local characterMeshSkin = MeshSkin(characterModelMesh, characterModelMaterial, -1)
 
-			-- assign hero skin
-			local curHeroSkin = ActorSkin()
-			curHeroSkin.characterSkin = characterMeshSkin
-			-- TODO: Figure out how to apply kickLegSkin and armSkin with the API, doesn't work at the moment
-			heroArray[#heroArray].SetSkin(curHeroSkin)
+			-- assign hero skin to bot
+			if (heroArray[#heroArray] ~= Player.actor) then
+				local curHeroSkin = ActorSkin()
+				curHeroSkin.characterSkin = characterMeshSkin
+				heroArray[#heroArray].SetSkin(curHeroSkin)
+			
+			-- assign hero skin to player
+			else
+				-- ActorSkin for assembling together characterSkin, armSkin, and kickLegSkin
+				local curHeroSkin = ActorSkin()
 
-			if (heroArray[#heroArray] == Player.actor) then
-				-- kickfoot model
-				local kickfootSMR = GameObject.Find("Player Fps Actor(Clone)").transform.GetChild(0).GetChild(0).GetChild(2).GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer)
-				kickfootSMR.sharedMesh = legSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
-				kickfootSMR.sharedMaterials = legSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
+				-- check if blue or red team
+				local heroSkinHands = nil
+				local heroSkinFoot = nil
+				local customColor = nil
+				if (Player.team == Team.blue) then
+					heroSkinHands = heroSkinHandsBlue
+					customColor = colorEagle
+					colorPattern = colorPatternEagle
+				else
+					heroSkinHands = heroSkinHandsRed
+					customColor = colorRaven
+					colorPattern = colorPatternRaven
+				end
+
+				-- character skin
+				curHeroSkin.characterSkin = characterMeshSkin
+
+				-- arms skin
+				local handsModelMesh = heroSkinHands.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
+				local handsModelMaterial = heroSkinHands.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
+				local armSkinMeshSkin = MeshSkin(handsModelMesh, handsModelMaterial, -1)
+				curHeroSkin.armSkin = armSkinMeshSkin
+
+				-- legs skin
+				local kickLegMesh = legSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMesh
+				local kickLegMaterial = legSkin.transform.GetChild(1).gameObject.GetComponent(SkinnedMeshRenderer).sharedMaterials
+				local kickLegMeshSkin = MeshSkin(kickLegMesh, kickLegMaterial, -1)
+				curHeroSkin.kickLegSkin = kickLegMeshSkin
+
+				Player.actor.SetSkin(curHeroSkin)
 			end
 		end
 
