@@ -49,6 +49,10 @@ local colorEagle = Color(0.25, 0.25, 1)			-- custom color to change on hero skin
 local colorPatternRaven = 1						-- material index for color raven
 local colorRaven = Color(1, 0.25, 0.25)			-- custom color to change on hero skin raven
 
+local isEnableDebugLog = false
+
+local isDisableHeroTag = false
+
 -- private variables
 local heroBlueArray = {}
 local heroRedArray = {}
@@ -82,8 +86,10 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 		return
 	end
 
-	print("TEAM: " .. tostring(team))
-	print("Number of actors: " .. tostring(#actorArray))
+	if (isEnableDebugLog) then
+		print("TEAM: " .. tostring(team))
+		print("Number of actors: " .. tostring(#actorArray))
+	end
 
 	-- remove player from array if specified
 	if (isDisablePlayerRandSelectHero and not isPlayerAlwaysHero) then
@@ -106,7 +112,9 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 		numHeroes = 0
 	end
 
-	print("Number of Heroes: " .. numHeroes)
+	if (isEnableDebugLog) then
+		print("Number of Heroes: " .. numHeroes)
+	end
 
 	-- exit if hero count is zero
 	if (numHeroes == 0) then
@@ -251,9 +259,13 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 
 				-- check if out of range
 				if (colorPatternInitialCheck) then
-					print("Skin has " .. tostring(#heroSoldierSMR.materials) .. " color patterns")
+					if (isEnableDebugLog) then
+						print("Skin has " .. tostring(#heroSoldierSMR.materials) .. " color patterns")
+					end
 					if (colorPattern > #heroSoldierSMR.materials) then
-						print("Color pattern #" .. tostring(colorPattern) .. " out of index. Reverting to #1")
+						if (isEnableDebugLog) then
+							print("Color pattern #" .. tostring(colorPattern) .. " out of index. Reverting to #1")
+						end
 						colorPattern = 1
 						if (teamColor == Color.blue) then
 							colorPatternEagle = 1
@@ -276,9 +288,13 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 
 				-- check if out of range
 				if (colorPatternInitialCheck) then
-					print("Skin has " .. tostring(#heroSoldierSMR.materials) .. " color patterns")
+					if (isEnableDebugLog) then
+						print("Skin has " .. tostring(#heroSoldierSMR.materials) .. " color patterns")
+					end
 					if (colorPattern > #heroSoldierSMR.materials) then
-						print("Color pattern #" .. tostring(colorPattern) .. " out of index. Reverting to #1")
+						if (isEnableDebugLog) then
+							print("Color pattern #" .. tostring(colorPattern) .. " out of index. Reverting to #1")
+						end
 						colorPattern = 1
 						if (teamColor == Color.blue) then
 							colorPatternEagle = 1
@@ -301,11 +317,14 @@ function TeamHeroes:InitializeHero(heroArray, numHeroes, percentHeroes, team, te
 				end
 			end
 		end
-		print("Index: " .. tostring(selectedHeroNum) .. " | Hero: " .. tostring(heroArray[#heroArray].name))
+		-- Rename hero
+		if not (isDisableHeroTag) then
+			heroArray[#heroArray].name = "[Hero] " .. heroArray[#heroArray].name
+		end
+		if (isEnableDebugLog) then
+			print("Index: " .. tostring(selectedHeroNum) .. " | " .. tostring(heroArray[#heroArray].name))
+		end
 	end
-	print("----------")
-
-	return
 end
 
 function TeamHeroes:InitializeHealthDict(heroArray, allyTeam, allyInitHealthDict)
@@ -340,14 +359,17 @@ function TeamHeroes:OptimizeCalc()
 	-- average range
 	local averageRange = (recruitRange + resupplyRangeAmmo + resupplyRangeHealth + damageRange + overhealRange) / 5
 	optimizeRange = averageRange
-	print("Optimize average range: " .. tostring(optimizeRange))
+	if (isEnableDebugLog) then
+		print("Optimize average range: " .. tostring(optimizeRange))
+	end
 
 	-- average time
 	local averageTime = (resupplyTimeAmmo + resupplyTimeHealth + damageTime) / 3
 	optimizeTime = averageTime
-	print("Optimize average delay (sec): " .. tostring(optimizeTime))
-
-	print("----------")
+	if (isEnableDebugLog) then
+		print("Optimize average delay (sec): " .. tostring(optimizeTime))
+		print("----------")
+	end
 end
 
 function TeamHeroes:OverhealAlly(heroArray, allyTeam, allyInitHealthDict)
@@ -413,7 +435,7 @@ function TeamHeroes:ResupplyAmmoSurround(heroArray, team)
 		-- NOTE: body still stays around after killed
 		if not (hero.isDead) then
 			-- get nearby actors
-			local actorsArray = ActorManager.AliveActorsInRange(hero.position, resupplyTimeAmmo)
+			local actorsArray = ActorManager.AliveActorsInRange(hero.position, resupplyRangeAmmo)
 
 			-- ammo self and surrounding team
 			for j,actor in ipairs(actorsArray) do
@@ -466,9 +488,23 @@ function TeamHeroes:AttackAndRecruitAlly()
 			enemyTeam = Team.Blue
 		end
 
-		-- Make hero attack
-		if ((hero.squad.order ~= nil) and (hero.squad.order.type ~= OrderType.Attack) and (hero.squad.leader ~= Player.actor)) then
-			local attackOrder = Order.Create(OrderType.Attack, ActorManager.RandomFrontlineSpawnPointForTeam(allyTeam), ActorManager.RandomFrontlineSpawnPointForTeam(enemyTeam))
+		-- make hero squad attack if defending
+		if (hero.squad.order ~= nil and hero.squad.order.type == OrderType.Defend and hero.squad.leader ~= Player.actor) then
+			-- find outgoing enemy/neutral connections from random ally frontline spawnpoint
+			local frontlineSpawnPointAlly = ActorManager.RandomFrontlineSpawnPointForTeam(allyTeam)
+			local neighoursOutgoing = frontlineSpawnPointAlly.neighoursOutgoing
+			local neighoursOutgoingAttackable = {}
+			for i,neighbour in pairs(neighoursOutgoing) do
+				if (neighbour.owner == enemyTeam or neighbour.owner == Team.Neutral) then
+					table.insert(neighoursOutgoingAttackable, neighbour)
+				end
+			end
+
+			-- choose random outgoing connection to attack
+			local index = math.random(1,#neighoursOutgoingAttackable)
+			local targetSpawnPoint = neighoursOutgoingAttackable[index]
+
+			local attackOrder = Order.Create(OrderType.Attack, frontlineSpawnPointAlly, targetSpawnPoint)
 			hero.squad.AssignOrder(attackOrder)
 		end
 
@@ -668,6 +704,10 @@ function TeamHeroes:setConfigurationVariables()
 	local colorGreenRaven = mutatorScript.GetConfigurationRange("colorGreenRaven")
 	local colorBlueRaven = mutatorScript.GetConfigurationRange("colorBlueRaven")
 	colorRaven = Color(colorRedRaven / 100, colorGreenRaven / 100, colorBlueRaven / 100)
+
+	isEnableDebugLog = mutatorScript.GetConfigurationBool("isEnableDebugLog")
+
+	isDisableHeroTag = mutatorScript.GetConfigurationBool("isDisableHeroTag")
 end
 
 function TeamHeroes:OptimizeUpdateStartBlue()
@@ -880,6 +920,9 @@ function TeamHeroes:Start()
 
 	-- initialize heroes
 	self:InitializeHero(heroBlueArray, numBlueHeroes, percentBlueHeroes, Team.Blue, Color.blue, heroSkinBlue, heroSkinFootBlue, heroBlueDict)
+	if (isEnableDebugLog) then
+		print("----------")
+	end
 	self:InitializeHero(heroRedArray, numRedHeroes, percentRedHeroes, Team.Red, Color.red, heroSkinRed, heroSkinFootRed, heroRedDict)
 
 	-- initialize health dictionary
@@ -929,5 +972,9 @@ function TeamHeroes:Start()
 		-- damage units around hero
 		self.script.StartCoroutine("HeroDamageStartBlue")
 		self.script.StartCoroutine("HeroDamageStartRed")
+	end
+
+	if (isEnableDebugLog) then
+		print("========================================")
 	end
 end

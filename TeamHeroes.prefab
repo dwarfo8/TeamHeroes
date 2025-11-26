@@ -61,10 +61,10 @@ MonoBehaviour:
         orderPriority: 7
       - id: labelEagleColor
         displayName: Eagle Custom Color
-        orderPriority: 30
+        orderPriority: 50
       - id: labelRavenColor
         displayName: Raven Custom Color
-        orderPriority: 35
+        orderPriority: 55
       integers:
       - id: numBlueHeroes
         displayName: Number of blue heroes
@@ -146,7 +146,7 @@ MonoBehaviour:
           wholeNumbers: 1
       - id: colorPatternEagle
         displayName: Color pattern
-        orderPriority: 31
+        orderPriority: 51
         value:
           value: 1
           min: 1
@@ -154,7 +154,7 @@ MonoBehaviour:
           wholeNumbers: 1
       - id: colorRedEagle
         displayName: Red
-        orderPriority: 32
+        orderPriority: 52
         value:
           value: 25
           min: 0
@@ -162,7 +162,7 @@ MonoBehaviour:
           wholeNumbers: 1
       - id: colorGreenEagle
         displayName: Green
-        orderPriority: 33
+        orderPriority: 53
         value:
           value: 25
           min: 0
@@ -170,7 +170,7 @@ MonoBehaviour:
           wholeNumbers: 1
       - id: colorBlueEagle
         displayName: Blue
-        orderPriority: 34
+        orderPriority: 54
         value:
           value: 100
           min: 0
@@ -178,7 +178,7 @@ MonoBehaviour:
           wholeNumbers: 1
       - id: colorPatternRaven
         displayName: Color pattern
-        orderPriority: 36
+        orderPriority: 56
         value:
           value: 1
           min: 1
@@ -186,7 +186,7 @@ MonoBehaviour:
           wholeNumbers: 1
       - id: colorRedRaven
         displayName: Red
-        orderPriority: 37
+        orderPriority: 57
         value:
           value: 100
           min: 0
@@ -194,7 +194,7 @@ MonoBehaviour:
           wholeNumbers: 1
       - id: colorGreenRaven
         displayName: Green
-        orderPriority: 38
+        orderPriority: 58
         value:
           value: 25
           min: 0
@@ -202,7 +202,7 @@ MonoBehaviour:
           wholeNumbers: 1
       - id: colorBlueRaven
         displayName: Blue
-        orderPriority: 39
+        orderPriority: 59
         value:
           value: 25
           min: 0
@@ -229,6 +229,14 @@ MonoBehaviour:
       - id: isDisableRecruit
         displayName: Disable recruitment
         orderPriority: 25
+        value: 0
+      - id: isEnableDebugLog
+        displayName: Enable debug log [PgUp]
+        orderPriority: 30
+        value: 0
+      - id: isDisableHeroTag
+        displayName: Disable hero tag
+        orderPriority: 31
         value: 0
       dropdowns:
       - id: isPercentConfig
